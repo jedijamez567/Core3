@@ -42,6 +42,7 @@ PlayerCreationManager::PlayerCreationManager() :
 	startingBank = 1000;
 
 	freeGodMode = false;
+	allowJediStartingProfession = false;
 
 	loadRacialCreationData();
 	loadDefaultCharacterItems();
@@ -274,6 +275,7 @@ void PlayerCreationManager::loadLuaConfig() {
 	startingBank = lua->getGlobalInt("startingBank");
 	skillPoints = lua->getGlobalInt("skillPoints");
 	freeGodMode = lua->getGlobalByte("freeGodMode");
+	allowJediStartingProfession = lua->getGlobalByte("allowJediStartingProfession");
 
 	loadLuaStartingItems(lua);
 
@@ -379,7 +381,8 @@ bool PlayerCreationManager::createCharacter(ClientCreateCharacterCallback* callb
 	String profession, customization, hairTemplate, hairCustomization;
 	callback->getSkill(profession);
 
-	if (profession.contains("jedi"))
+	// Check if Jedi is allowed as starting profession (configurable via Lua)
+	if (!allowJediStartingProfession && profession.contains("jedi"))
 		profession = "crafting_artisan";
 
 	callback->getCustomizationString(customization);
@@ -488,8 +491,9 @@ bool PlayerCreationManager::createCharacter(ClientCreateCharacterCallback* callb
 
 							Time timeVal(sec);
 
-							if (timeVal.miliDifference() < 3600000) {
-								ErrorMessage* errMsg = new ErrorMessage("Create Error", "You are only permitted to create one character per hour. Repeat attempts prior to 1 hour elapsing will reset the timer.", 0x0);
+							if (timeVal.miliDifference() < 60000) {
+								// SWG WEEKENDER - Adjusted to 1 minute instead of 1 hour.
+								ErrorMessage* errMsg = new ErrorMessage("Create Error", "You are only permitted to create one character per minute. Repeat attempts prior to 1 minute elapsing will reset the timer.", 0x0);
 								client->sendMessage(errMsg);
 
 								playerCreature->destroyPlayerCreatureFromDatabase(true);

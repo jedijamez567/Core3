@@ -150,6 +150,7 @@ void FrsManagerImplementation::loadLuaConfig() {
 	auto zoneServer = this->zoneServer.get();
 
 	frsEnabled = lua->getGlobalInt("frsEnabled");
+	autoPromotionEnabled = lua->getGlobalInt("autoPromotionEnabled");
 	petitionInterval = lua->getGlobalLong("petitionInterval");
 	votingInterval = lua->getGlobalLong("votingInterval");
 	acceptanceInterval = lua->getGlobalLong("acceptanceInterval");
@@ -371,6 +372,40 @@ void FrsManagerImplementation::playerLoggedIn(CreatureObject* player) {
 
 	validatePlayerData(player);
 	deductDebtExperience(player);
+
+	//SWG Weekender 2025: Auto-Promotion Feature
+	// Check for auto-promotion on login if enabled
+	if (autoPromotionEnabled) {
+		PlayerObject* ghost = player->getPlayerObject();
+		
+		if (ghost != nullptr) {
+			FrsData* playerData = ghost->getFrsData();
+			int rank = playerData->getRank();
+			int councilType = playerData->getCouncilType();
+			
+			// Only check for promotion if player is in a council and not at max rank
+			if (rank >= 0 && rank < 11 && (councilType == COUNCIL_LIGHT || councilType == COUNCIL_DARK)) {
+				int nextRank = rank + 1;
+				
+				// Get the next rank's required XP
+				Reference<FrsRankingData*> nextRankData = nullptr;
+				if (councilType == COUNCIL_LIGHT)
+					nextRankData = lightRankingData.get(nextRank);
+				else if (councilType == COUNCIL_DARK)
+					nextRankData = darkRankingData.get(nextRank);
+
+				if (nextRankData != nullptr) {
+					int reqXp = nextRankData->getRequiredExperience();
+					int currentXp = ghost->getExperience("force_rank_xp");
+
+					// Auto-promotion bypasses voting and skill prerequisites - only FRS XP matters
+					if (currentXp >= reqXp) {
+						promotePlayer(player);
+					}
+				}
+			}
+		}
+	}
 }
 
 bool FrsManagerImplementation::isBanned(CreatureObject* player) {
@@ -867,6 +902,35 @@ void FrsManagerImplementation::adjustFrsExperience(CreatureObject* player, int a
 			param.setDI(amount);
 
 			player->sendSystemMessage(param);
+		}
+
+		// Check for auto-promotion if enabled
+		if (autoPromotionEnabled) {
+			FrsData* playerData = ghost->getFrsData();
+			int rank = playerData->getRank();
+			int councilType = playerData->getCouncilType();
+
+			// Only check for promotion if player is in a council and not at max rank
+			if (rank >= 0 && rank < 11 && (councilType == COUNCIL_LIGHT || councilType == COUNCIL_DARK)) {
+				int nextRank = rank + 1;
+				
+				// Get the next rank's required XP
+				Reference<FrsRankingData*> nextRankData = nullptr;
+				if (councilType == COUNCIL_LIGHT)
+					nextRankData = lightRankingData.get(nextRank);
+				else if (councilType == COUNCIL_DARK)
+					nextRankData = darkRankingData.get(nextRank);
+
+				if (nextRankData != nullptr) {
+					int reqXp = nextRankData->getRequiredExperience();
+					int newExperience = ghost->getExperience("force_rank_xp");
+
+					// Auto-promotion bypasses voting and skill prerequisites - only FRS XP matters
+					if (newExperience >= reqXp) {
+						promotePlayer(player);
+					}
+				}
+			}
 		}
 	} else {
 		FrsData* playerData = ghost->getFrsData();

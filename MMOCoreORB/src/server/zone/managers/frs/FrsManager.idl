@@ -87,6 +87,7 @@ class FrsManager extends ManagedService implements Logger {
 	protected transient VectorMap experienceValues;
 
 	protected transient boolean frsEnabled;
+	protected transient boolean autoPromotionEnabled;
 	protected transient boolean sameAccountEnclaveRestrictions;
 
 	protected transient unsigned long petitionInterval;
@@ -118,6 +119,7 @@ class FrsManager extends ManagedService implements Logger {
 		rankMaintenanceTask = null;
 
 		frsEnabled = false;
+		autoPromotionEnabled = false;
 
 		lightEnclave = null;
 		darkEnclave = null;

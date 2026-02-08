@@ -35,6 +35,22 @@ function ForceShrineMenuComponent:doMeditate(pObject, pPlayer)
 	if (tonumber(readScreenPlayData(pPlayer, "KnightTrials", "completedTrials")) == 1 and not CreatureObject(pPlayer):hasSkill("force_title_jedi_rank_03")) then
 		KnightTrials:resetCompletedTrialsToStart(pPlayer)
 	end
+	
+	-- Check if player is in Force Sensitive state (state 1) for Hologrind progression
+	local pGhost = CreatureObject(pPlayer):getPlayerObject()
+	if (pGhost ~= nil) then
+		local jediState = PlayerObject(pGhost):getJediState()
+		local hologrindProfessions = PlayerObject(pGhost):getHologrindProfessions()
+		
+		-- If player is Force Sensitive (state 1) and on Hologrind progression (has professions assigned), unlock them fully
+		if (jediState == 1 and hologrindProfessions ~= nil and #hologrindProfessions > 0) then
+			-- Award Jedi skills and starter kit via HologrindJediManager
+			HologrindJediManager = require("managers.jedi.hologrind_jedi_manager")
+			HologrindJediManager:awardJediStatusAndSkill(pPlayer)
+			CreatureObject(pPlayer):sendSystemMessage("You have unlocked the path of the Jedi!")
+			return
+		end
+	end
 
 	if (not CreatureObject(pPlayer):hasSkill("force_title_jedi_rank_02") and CreatureObject(pPlayer):hasScreenPlayState(32, "VillageJediProgression")) then
 		local currentTrial = JediTrials:getCurrentTrial(pPlayer)

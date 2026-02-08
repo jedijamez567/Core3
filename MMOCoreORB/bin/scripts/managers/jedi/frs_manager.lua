@@ -27,7 +27,7 @@ maxChallenges = 20
 missedVotePenalty = 100 -- FRS XP
 
 -- Restrict players from voting for and challenging other characters on their account
-sameAccountEnclaveRestrictions = 1
+sameAccountEnclaveRestrictions = 0
 
 -- { rank, skillName, requiredExperience, playerCap, robe }
 lightRankingData = {
@@ -100,7 +100,7 @@ enclaveRoomRequirements = {
 -- Key references the player's target
 -- Ex: Rank 5 loses to BH, see "bh_lose" key and 6th integer value in same row
 frsExperienceValues = {
-	{ "nonjedi_win", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+	{ "nonjedi_win", 50, 100, 200, 400, 800, 1600, 3200, 6400, 6500, 7000, 10000, 15000 },
 	{ "nonjedi_lose", 1000, 1250, 1759, 2250, 3000, 3750, 4750, 5500, 6750, 7750, 8750, 10000 },
 	{ "bh_win", 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500 },
 	{ "bh_lose", 1000, 1250, 1759, 2250, 3000, 3750, 4750, 5500, 6750, 7750, 8750, 10000 },
