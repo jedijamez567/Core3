@@ -51,6 +51,7 @@ IDL_DIRECTIVES = -outdir autogen -cp $(IDL_CLASSPATH)
 UNITTEST_DIRECTIVES =
 
 CMAKE_ARGS =
+NINJA_JOBS ?= 0
 
 BUILD_PATH = build/unix
 DEFAULT_BUILD_TYPE = RelWithDebInfo
@@ -135,7 +136,7 @@ clean-ninja:
 
 build-ninja-debug:
 	mkdir -p $(BUILD_PATH)/ninja-debug
-	cd $(BUILD_PATH)/ninja-debug && cmake -G Ninja -DRUN_GIT=ON -DCMAKE_BUILD_TYPE=Debug $(CMAKE_ARGS) ../../.. && ninja
+	cd $(BUILD_PATH)/ninja-debug && cmake -G Ninja -DRUN_GIT=ON -DCMAKE_BUILD_TYPE=Debug $(CMAKE_ARGS) ../../.. && ninja -j$(NINJA_JOBS)
 
 clean-ninja-debug:
 	rm -rf $(BUILD_PATH)/ninja-debug
