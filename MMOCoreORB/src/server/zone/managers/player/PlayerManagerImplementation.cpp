@@ -248,6 +248,7 @@ void PlayerManagerImplementation::loadLuaConfig() {
 	baseStoredDroids = lua->getGlobalInt("baseStoredDroids");
 	baseStoredVehicles = lua->getGlobalInt("baseStoredVehicles");
 	baseStoredShips = lua->getGlobalInt("baseStoredShips");
+	vehicleCallDelay = lua->getGlobalInt("vehicleCallDelay");
 
 	veteranRewardAdditionalMilestones = lua->getGlobalInt("veteranRewardAdditionalMilestones");
 

@@ -1,3 +1,6 @@
+--Character creation cooldown in seconds. Set to 0 to disable. Default: 3600 (1 hour)
+characterCreationCooldown = 3600
+
 --Should all created players start with God Mode? 1 = yes, 0 = no
 freeGodMode = 0;
 --How many cash credits new characters start with after creating a character (changed during test phase, normal value is 100)

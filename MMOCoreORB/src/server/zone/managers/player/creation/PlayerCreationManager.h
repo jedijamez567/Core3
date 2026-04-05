@@ -74,6 +74,7 @@ class PlayerCreationManager : public Singleton<PlayerCreationManager>, public Lo
 
 	bool freeGodMode;
 	bool allowJediStartingProfession;
+	int characterCreationCooldown;
 
 	mutable HashTable<uint32, Time> lastCreatedCharacter;
 	mutable Mutex charCountMutex;

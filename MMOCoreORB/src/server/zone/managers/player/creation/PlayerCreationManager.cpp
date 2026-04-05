@@ -276,6 +276,7 @@ void PlayerCreationManager::loadLuaConfig() {
 	skillPoints = lua->getGlobalInt("skillPoints");
 	freeGodMode = lua->getGlobalByte("freeGodMode");
 	allowJediStartingProfession = lua->getGlobalByte("allowJediStartingProfession");
+	characterCreationCooldown = lua->getGlobalInt("characterCreationCooldown");
 
 	loadLuaStartingItems(lua);
 
@@ -477,40 +478,16 @@ bool PlayerCreationManager::createCharacter(ClientCreateCharacterCallback* callb
 					playerManager->updatePermissionLevel(playerCreature, accountPermissionLevel);
 				}
 
-				if (accountPermissionLevel < 9) {
-					try {
-						StringBuffer query;
-						uint32 galaxyId = zoneServer.get()->getGalaxyID();
-						uint32 accountId = client->getAccountID();
-						query << "(SELECT UNIX_TIMESTAMP(c.creation_date) as t FROM characters as c WHERE c.account_id = " << accountId << " AND c.galaxy_id = " << galaxyId << " ORDER BY c.creation_date DESC) UNION (SELECT UNIX_TIMESTAMP(d.creation_date) FROM deleted_characters as d WHERE d.account_id = " << accountId << " AND d.galaxy_id = " << galaxyId << " ORDER BY d.creation_date DESC) ORDER BY t DESC LIMIT 1";
-
-						UniqueReference<ResultSet*> res(ServerDatabase::instance()->executeQuery(query));
-
-						if (res != nullptr && res->next()) {
-							uint32 sec = res->getUnsignedInt(0);
-
-							Time timeVal(sec);
-
-							if (timeVal.miliDifference() < 60000) {
-								// SWG WEEKENDER - Adjusted to 1 minute instead of 1 hour.
-								ErrorMessage* errMsg = new ErrorMessage("Create Error", "You are only permitted to create one character per minute. Repeat attempts prior to 1 minute elapsing will reset the timer.", 0x0);
-								client->sendMessage(errMsg);
-
-								playerCreature->destroyPlayerCreatureFromDatabase(true);
-								return false;
-							}
-						}
-					} catch (const DatabaseException& e) {
-						error(e.getMessage());
-					}
-
+				if (accountPermissionLevel < 9 && characterCreationCooldown > 0) {
 					Locker locker(&charCountMutex);
 
 					if (lastCreatedCharacter.containsKey(accID)) {
 						Time lastCreatedTime = lastCreatedCharacter.get(accID);
 
-						if (lastCreatedTime.miliDifference() < 3600000) {
-							ErrorMessage* errMsg = new ErrorMessage("Create Error", "You are only permitted to create one character per hour. Repeat attempts prior to 1 hour elapsing will reset the timer.", 0x0);
+						if (lastCreatedTime.miliDifference() < characterCreationCooldown * 1000) {
+							StringBuffer cooldownMsg;
+							cooldownMsg << "You are only permitted to create one character every " << characterCreationCooldown << " seconds. Repeat attempts prior to the cooldown elapsing will reset the timer.";
+							ErrorMessage* errMsg = new ErrorMessage("Create Error", cooldownMsg.toString(), 0x0);
 							client->sendMessage(errMsg);
 
 							playerCreature->destroyPlayerCreatureFromDatabase(true);
@@ -583,12 +560,17 @@ bool PlayerCreationManager::createCharacter(ClientCreateCharacterCallback* callb
 	//Join auction chat room
 	ghost->addChatRoom(chatManager->getAuctionRoom()->getRoomID());
 
-	ManagedReference<SuiMessageBox*> box = new SuiMessageBox(playerCreature, SuiWindowType::NONE);
-	box->setPromptTitle("PLEASE NOTE");
-	box->setPromptText("You are limited to creating one character per hour. Attempting to create another character or deleting your character before the 1 hour timer expires will reset the timer.");
+	if (characterCreationCooldown > 0) {
+		ManagedReference<SuiMessageBox*> box = new SuiMessageBox(playerCreature, SuiWindowType::NONE);
+		box->setPromptTitle("PLEASE NOTE");
 
-	ghost->addSuiBox(box);
-	playerCreature->sendMessage(box->generateMessage());
+		StringBuffer cooldownNote;
+		cooldownNote << "You are limited to creating one character every " << characterCreationCooldown << " seconds. Attempting to create another character or deleting your character before the timer expires will reset the timer.";
+		box->setPromptText(cooldownNote.toString());
+
+		ghost->addSuiBox(box);
+		playerCreature->sendMessage(box->generateMessage());
+	}
 
 	return true;
 }

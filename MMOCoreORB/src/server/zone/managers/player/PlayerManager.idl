@@ -85,6 +85,7 @@ class PlayerManager extends Observer implements Logger {
 	protected int baseStoredDroids;
 	protected int baseStoredVehicles;
 	protected int baseStoredShips;
+	protected int vehicleCallDelay;
 	protected boolean allowSameAccountPvpRatingCredit;
 	protected int onlineCharactersPerAccount;
 
@@ -563,6 +564,10 @@ class PlayerManager extends Observer implements Logger {
 
 	public int getBaseStoredShips() {
 		return baseStoredShips;
+	}
+
+	public int getVehicleCallDelay() {
+		return vehicleCallDelay;
 	}
 
 	public int getNumVeteranRewardMilestones(){

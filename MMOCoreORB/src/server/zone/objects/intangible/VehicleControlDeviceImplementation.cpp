@@ -79,15 +79,17 @@ void VehicleControlDeviceImplementation::generateObject(CreatureObject* player) 
 		}
 	}
 
-	if(player->getCurrentCamp() == nullptr && player->getCityRegion() == nullptr) {
+	int vehicleCallDelay = player->getZoneServer()->getPlayerManager()->getVehicleCallDelay();
+
+	if(vehicleCallDelay > 0 && player->getCurrentCamp() == nullptr && player->getCityRegion() == nullptr) {
 
 		Reference<CallMountTask*> callMount = new CallMountTask(_this.getReferenceUnsafeStaticCast(), player, "call_mount");
 
 		StringIdChatParameter message("pet/pet_menu", "call_vehicle_delay");
-		message.setDI(15);
+		message.setDI(vehicleCallDelay);
 		player->sendSystemMessage(message);
 
-		player->addPendingTask("call_mount", callMount, 15 * 1000);
+		player->addPendingTask("call_mount", callMount, vehicleCallDelay * 1000);
 
 		if (vehicleControlObserver == nullptr) {
 			vehicleControlObserver = new VehicleControlObserver(_this.getReferenceUnsafeStaticCast());
