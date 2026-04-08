@@ -69,6 +69,8 @@ class MissionManager extends Observer implements Logger {
 	unsigned long destroyMissionRandomReward;
 	unsigned long destroyMissionDifficultyRandomReward;
 
+	unsigned long maximumMissions;
+
 	public MissionManager(ZoneServer srv, ZoneProcessServer impl) {
 		server = srv;
 		processor = impl;
@@ -80,6 +82,7 @@ class MissionManager extends Observer implements Logger {
 		enableFactionalEntertainerMissions = false;
 		enableSameAccountBountyMissions = false;
 		playerBountyKillBuffer = 0;
+		maximumMissions = 2;
 
 		Logger.setLoggingName("MissionManager");
 

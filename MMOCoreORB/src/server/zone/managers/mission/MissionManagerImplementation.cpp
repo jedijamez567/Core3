@@ -111,6 +111,8 @@ void MissionManagerImplementation::loadLuaSettings() {
 		destroyMissionRandomReward = lua->getGlobalLong("destroyMissionRandomReward");
 		destroyMissionDifficultyRandomReward = lua->getGlobalLong("destroyMissionDifficultyRandomReward");
 
+		maximumMissions = lua->getGlobalLong("maximumMissions");
+
 		delete lua;
 	}
 	catch (Exception& e) {
@@ -264,8 +266,8 @@ void MissionManagerImplementation::handleMissionAccept(MissionTerminal* missionT
 		}
 	}
 
-	//Limit to two missions (only one of them can be a bounty mission)
-	if (missionCount >= 2 || (hasBountyMission && mission->getTypeCRC() == MissionTypes::BOUNTY)) {
+	//Limit number of missions (only one of them can be a bounty mission)
+	if (missionCount >= maximumMissions || (hasBountyMission && mission->getTypeCRC() == MissionTypes::BOUNTY)) {
 		StringIdChatParameter stringId("mission/mission_generic", "too_many_missions");
 		player->sendSystemMessage(stringId);
 		return;
