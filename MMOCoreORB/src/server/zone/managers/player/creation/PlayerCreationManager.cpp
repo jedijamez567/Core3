@@ -382,6 +382,7 @@ bool PlayerCreationManager::createCharacter(ClientCreateCharacterCallback* callb
 	String profession, customization, hairTemplate, hairCustomization;
 	callback->getSkill(profession);
 
+	// SWG Weekender
 	// Check if Jedi is allowed as starting profession (configurable via Lua)
 	if (!allowJediStartingProfession && profession.contains("jedi"))
 		profession = "crafting_artisan";
