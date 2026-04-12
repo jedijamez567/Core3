@@ -49,6 +49,8 @@ namespace server {
 
 				void updateHash(const String& username, const String& password);
 
+				static void setAccountJediUnlocked(uint32 accountID, bool unlocked);
+
 				//These lookup an account on the mysql database...
 				//Account* lookupAccount(uint32 accountID);
 				//Account* lookupAccount(uint64 characterID);

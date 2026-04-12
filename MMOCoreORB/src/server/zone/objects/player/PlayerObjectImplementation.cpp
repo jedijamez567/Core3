@@ -2952,7 +2952,20 @@ void PlayerObjectImplementation::setJediState(int state, bool notifyClient) {
 	if (jediState == state)
 		return;
 
+	int previousState = jediState;
 	jediState = state;
+
+	// First time any character on this account reaches Padawan (state==2),
+	// Light Knight (4), or Dark Knight (8): persist a permanent jedi_unlocked
+	// flag on the accounts table so future characters on this account can be
+	// created directly as Jedi via the starting-profession path.
+	if (state >= 2 && previousState < 2) {
+		if (account != nullptr && !account->isJediUnlocked()) {
+			Locker accountLocker(account);
+			account->setJediUnlocked(true);
+			AccountManager::setAccountJediUnlocked(account->getAccountID(), true);
+		}
+	}
 
 	if (!notifyClient)
 		return;

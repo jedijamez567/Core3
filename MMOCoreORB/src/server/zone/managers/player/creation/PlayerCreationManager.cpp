@@ -442,6 +442,17 @@ bool PlayerCreationManager::createCharacter(ClientCreateCharacterCallback* callb
 	addCustomization(playerCreature, customization,
 			playerTemplate->getAppearanceFilename());
 	addHair(playerCreature, hairTemplate, hairCustomization);
+
+	// Load the account BEFORE addProfessionStartingItems so that the
+	// SkillManager::fulfillsSkillPrerequisites bypass for jedi-unlocked
+	// accounts can see ghost->getAccount() during the PRFI skill grant.
+	// initializeAccount() is idempotent (it lazy-loads only when account==nullptr),
+	// so the duplicate call further down stays a safe no-op.
+	if (ghost != nullptr) {
+		ghost->setAccountID(client->getAccountID());
+		ghost->initializeAccount();
+	}
+
 	if (!doTutorial) {
 		addProfessionStartingItems(playerCreature, profession, clientTemplate,
 				false);
@@ -459,9 +470,13 @@ bool PlayerCreationManager::createCharacter(ClientCreateCharacterCallback* callb
 	}
 
 	if (ghost != nullptr) {
+		// Account is already loaded earlier (before addProfessionStartingItems);
+		// the setAccountID/initializeAccount calls that used to live here would
+		// trip the misleading "nullptr Account in initialize transient objects"
+		// error in PlayerObjectImplementation::initializeAccount's else branch
+		// because galaxyAccountInfo is already populated. accID is still needed
+		// for the character cooldown logic below.
 		int accID = client->getAccountID();
-		ghost->setAccountID(accID);
-		ghost->initializeAccount();
 
 		if (!freeGodMode) {
 			try {

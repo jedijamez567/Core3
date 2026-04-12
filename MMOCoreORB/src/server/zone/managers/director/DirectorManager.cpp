@@ -37,6 +37,7 @@
 #include "server/zone/managers/planet/PlanetManager.h"
 #include "server/zone/managers/player/PlayerManager.h"
 #include "server/zone/managers/player/creation/PlayerCreationManager.h"
+#include "server/login/account/AccountManager.h"
 #include "server/zone/managers/reaction/ReactionManager.h"
 #include "server/ServerCore.h"
 #include "server/chat/ChatManager.h"
@@ -492,6 +493,7 @@ void DirectorManager::initializeLuaEngine(Lua* luaEngine) {
 	luaEngine->registerFunction("getGCWDiscount", getGCWDiscount);
 	luaEngine->registerFunction("getTerrainHeight", getTerrainHeight);
 	luaEngine->registerFunction("awardSkill", awardSkill);
+	luaEngine->registerFunction("markAccountJediUnlocked", markAccountJediUnlocked);
 	luaEngine->registerFunction("getCityRegionAt", getCityRegionAt);
 	luaEngine->registerFunction("setDungeonTicketAttributes", setDungeonTicketAttributes);
 	luaEngine->registerFunction("setQuestStatus", setQuestStatus);
@@ -3425,6 +3427,37 @@ int DirectorManager::awardSkill(lua_State* L) {
 		return 0;
 
 	SkillManager::instance()->awardSkill(skillName, creature, true, true, true);
+
+	return 0;
+}
+
+int DirectorManager::markAccountJediUnlocked(lua_State* L) {
+	if (checkArgumentCount(L, 1) == 1) {
+		String err = "incorrect number of arguments passed to DirectorManager::markAccountJediUnlocked";
+		printTraceError(L, err);
+		ERROR_CODE = INCORRECT_ARGUMENTS;
+		return 0;
+	}
+
+	CreatureObject* creature = (CreatureObject*)lua_touserdata(L, -1);
+
+	if (creature == nullptr)
+		return 0;
+
+	ManagedReference<PlayerObject*> ghost = creature->getPlayerObject();
+	if (ghost == nullptr)
+		return 0;
+
+	ManagedReference<Account*> account = ghost->getAccount();
+	if (account == nullptr || account->isJediUnlocked())
+		return 0;
+
+	{
+		Locker accountLocker(account);
+		account->setJediUnlocked(true);
+	}
+
+	AccountManager::setAccountJediUnlocked(account->getAccountID(), true);
 
 	return 0;
 }

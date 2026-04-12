@@ -136,7 +136,7 @@ void AccountManager::loginApprovedAccount(LoginClient* client, ManagedReference<
 Reference<Account*> AccountManager::validateAccountCredentials(LoginClient* client, const String& username, const String& password) {
 	StringBuffer query;
 	query << "SELECT a.account_id, a.username, a.password, a.salt, a.account_id, a.station_id, "
-		"UNIX_TIMESTAMP(a.created), a.admin_level FROM accounts a WHERE a.username = '" << username << "' LIMIT 1;";
+		"UNIX_TIMESTAMP(a.created), a.admin_level, a.jedi_unlocked FROM accounts a WHERE a.username = '" << username << "' LIMIT 1;";
 
 	String passwordStored;
 	Reference<Account*> account = getAccount(query.toString(), passwordStored, true); //force update of mysql rows to update galaxy bans
@@ -246,6 +246,20 @@ void AccountManager::updateHash(const String& username, const String& password) 
 	}
 }
 
+void AccountManager::setAccountJediUnlocked(uint32 accountID, bool unlocked) {
+	static Logger logger("AccountManager");
+
+	StringBuffer query;
+	query << "UPDATE accounts SET jedi_unlocked = " << (unlocked ? 1 : 0)
+	      << " WHERE account_id = " << accountID << ";";
+
+	try {
+		ServerDatabase::instance()->executeStatement(query);
+	} catch (const DatabaseException& e) {
+		logger.error("setAccountJediUnlocked: " + e.getMessage());
+	}
+}
+
 Reference<Account*> AccountManager::createAccount(const String& username, const String& password, String& passwordStored) {
 	uint32 stationID = System::random();
 
@@ -296,7 +310,7 @@ Reference<Account*> AccountManager::getAccount(uint32 accountID, bool forceSqlUp
 	}
 
 	StringBuffer query;
-	query << "SELECT a.active, a.username, a.password, a.salt, a.account_id, a.station_id, UNIX_TIMESTAMP(a.created), a.admin_level FROM accounts a WHERE a.account_id = '" << accountID << "' LIMIT 1;";
+	query << "SELECT a.active, a.username, a.password, a.salt, a.account_id, a.station_id, UNIX_TIMESTAMP(a.created), a.admin_level, a.jedi_unlocked FROM accounts a WHERE a.account_id = '" << accountID << "' LIMIT 1;";
 
 	UniqueReference<ResultSet*> result(ServerDatabase::instance()->executeQuery(query.toString()));
 
@@ -319,6 +333,7 @@ Reference<Account*> AccountManager::getAccount(uint32 accountID, bool forceSqlUp
 		}
 
 		accObj->setAdminLevel(result->getInt(7));
+		accObj->setJediUnlocked(result->getBoolean(8));
 
 		accObj->updateFromDatabase();
 
@@ -330,7 +345,7 @@ Reference<Account*> AccountManager::getAccount(uint32 accountID, bool forceSqlUp
 
 Reference<Account*> AccountManager::getAccount(uint32 accountID, String& passwordStored, bool forceSqlUpdate) {
 	StringBuffer query;
-	query << "SELECT a.active, a.username, a.password, a.salt, a.account_id, a.station_id, UNIX_TIMESTAMP(a.created), a.admin_level FROM accounts a WHERE a.account_id = '" << accountID << "' LIMIT 1;";
+	query << "SELECT a.active, a.username, a.password, a.salt, a.account_id, a.station_id, UNIX_TIMESTAMP(a.created), a.admin_level, a.jedi_unlocked FROM accounts a WHERE a.account_id = '" << accountID << "' LIMIT 1;";
 
 	return getAccount(query.toString(), passwordStored, forceSqlUpdate);
 }
@@ -390,6 +405,7 @@ Reference<Account*> AccountManager::getAccount(String query, String& passwordSto
 		}
 
 		account->setAdminLevel(result->getInt(7));
+		account->setJediUnlocked(result->getBoolean(8));
 
 		account->updateFromDatabase();
 
@@ -405,7 +421,7 @@ Reference<Account*> AccountManager::getAccount(const String& accountName, bool f
 	Database::escapeString(name);
 
 	StringBuffer query;
-	query << "SELECT a.active, a.username, a.password, a.salt, a.account_id, a.station_id, UNIX_TIMESTAMP(a.created), a.admin_level FROM accounts a WHERE a.username = '" << name << "' LIMIT 1;";
+	query << "SELECT a.active, a.username, a.password, a.salt, a.account_id, a.station_id, UNIX_TIMESTAMP(a.created), a.admin_level, a.jedi_unlocked FROM accounts a WHERE a.username = '" << name << "' LIMIT 1;";
 
 	String temp;
 

@@ -19,6 +19,7 @@ void AccountImplementation::initializeTransientMembers() {
 	adminLevel = 0;
 	banExpires = 0;
 	banAdmin = 0;
+	jediUnlocked = false;
 }
 
 void AccountImplementation::updateFromDatabase() {

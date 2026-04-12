@@ -21,6 +21,7 @@ class Account extends ManagedObject implements Logger {
 	protected transient unsigned int accountID;
 	protected transient unsigned int stationID;
 	protected transient unsigned int adminLevel;
+	protected transient boolean jediUnlocked;
 	protected unsigned int created;
 
 	protected transient CharacterList characterList;
@@ -57,6 +58,11 @@ class Account extends ManagedObject implements Logger {
 	@preLocked
 	public void setAdminLevel(unsigned int adminlvl) {
 		adminLevel = adminlvl;
+	}
+
+	@preLocked
+	public void setJediUnlocked(boolean unlocked) {
+		jediUnlocked = unlocked;
 	}
 
 	@preLocked
@@ -121,6 +127,11 @@ class Account extends ManagedObject implements Logger {
 	@read
 	public unsigned int getAdminLevel() {
 		return adminLevel;
+	}
+
+	@read
+	public boolean isJediUnlocked() {
+		return jediUnlocked == true;
 	}
 
 	@read

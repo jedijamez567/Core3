@@ -13,6 +13,7 @@
 #include "server/zone/objects/group/GroupObject.h"
 #include "server/zone/managers/player/PlayerManager.h"
 #include "server/zone/managers/jedi/JediManager.h"
+#include "server/login/account/Account.h"
 #include "templates/manager/TemplateManager.h"
 #include "templates/datatables/DataTableIff.h"
 #include "templates/datatables/DataTableRow.h"
@@ -785,8 +786,18 @@ bool SkillManager::fulfillsSkillPrerequisites(const String& skillName, CreatureO
 	}
 
 	PlayerObject* ghost = creature->getPlayerObject();
-	if (ghost == nullptr || ghost->getJediState() < skill->getJediStateRequired()) {
+	if (ghost == nullptr) {
 		return false;
+	}
+	if (ghost->getJediState() < skill->getJediStateRequired()) {
+		// Account-wide jedi unlock: any character on an account that has previously
+		// earned Padawan rank may bypass the per-character jediState gate. This is
+		// what allows the starting-jedi profession PRFI grant to succeed at character
+		// creation on a jedi-unlocked account.
+		ManagedReference<Account*> account = ghost->getAccount();
+		if (account == nullptr || !account->isJediUnlocked()) {
+			return false;
+		}
 	}
 
 	if (ghost->isPrivileged())
