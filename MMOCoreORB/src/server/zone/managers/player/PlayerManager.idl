@@ -106,6 +106,13 @@ class PlayerManager extends Observer implements Logger {
 	private float globalExpMultiplier;
 	private float groupExpMultiplier;
 
+	private boolean applyGlobalXpMultiplierToJediDeathLoss;
+	private float jediDeathXpLossPercent;
+	private int jediDeathBountyXpLossCreditsMultiplier;
+	private int jediDeathBountyXpLossMin;
+	private int jediDeathBountyXpLossMax;
+	private int jediDeathForceReviveXpLoss;
+
 	@dereferenced
 	private transient ReadWriteLock onlineMapMutex;
 
@@ -593,6 +600,30 @@ class PlayerManager extends Observer implements Logger {
 
 	public int getOnlineCharactersPerAccount() {
 	    return onlineCharactersPerAccount;
+	}
+
+	public boolean getApplyGlobalXpMultiplierToJediDeathLoss() {
+		return applyGlobalXpMultiplierToJediDeathLoss;
+	}
+
+	public float getJediDeathXpLossPercent() {
+		return jediDeathXpLossPercent;
+	}
+
+	public int getJediDeathBountyXpLossCreditsMultiplier() {
+		return jediDeathBountyXpLossCreditsMultiplier;
+	}
+
+	public int getJediDeathBountyXpLossMin() {
+		return jediDeathBountyXpLossMin;
+	}
+
+	public int getJediDeathBountyXpLossMax() {
+		return jediDeathBountyXpLossMax;
+	}
+
+	public int getJediDeathForceReviveXpLoss() {
+		return jediDeathForceReviveXpLoss;
 	}
 
 	@local

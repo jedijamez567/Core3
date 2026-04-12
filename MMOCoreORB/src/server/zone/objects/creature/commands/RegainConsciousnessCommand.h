@@ -62,10 +62,11 @@ public:
 
 			// Jedi XP Loss
 			PlayerManager* playerManager = server->getZoneServer()->getPlayerManager();
-			playerManager->awardExperience(creature, "jedi_general", -50000, true);
+			int forceReviveXpLoss = playerManager->getJediDeathForceReviveXpLoss();
+			playerManager->awardExperience(creature, "jedi_general", -forceReviveXpLoss, true, 1.0f, playerManager->getApplyGlobalXpMultiplierToJediDeathLoss());
 
 			StringIdChatParameter message("base_player","prose_revoke_xp");
-			message.setDI(-50000);
+			message.setDI(forceReviveXpLoss);
 			message.setTO("exp_n", "jedi_general");
 			creature->sendSystemMessage(message);
 

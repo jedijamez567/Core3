@@ -595,19 +595,21 @@ void BountyMissionObjectiveImplementation::handlePlayerKilled(ManagedObject* arg
 			if (zoneServer != nullptr) {
 				ManagedReference<CreatureObject*> target = zoneServer->getObject(mission->getTargetObjectId()).castTo<CreatureObject*>();
 				if (target != nullptr) {
-					int minXpLoss = -50000;
-					int maxXpLoss = -500000;
+					ManagedReference<PlayerManager*> playerManager = owner->getZoneServer()->getPlayerManager();
+
+					int minXpLoss = -playerManager->getJediDeathBountyXpLossMin();
+					int maxXpLoss = -playerManager->getJediDeathBountyXpLossMax();
 
 					VisibilityManager::instance()->clearVisibility(target);
 					int rewardCreds = mission->getRewardCredits() + mission->getBonusCredits();
-					int xpLoss = rewardCreds * -2;
+					int xpLoss = rewardCreds * -playerManager->getJediDeathBountyXpLossCreditsMultiplier();
 
 					if (xpLoss > minXpLoss)
 						xpLoss = minXpLoss;
 					else if (xpLoss < maxXpLoss)
 						xpLoss = maxXpLoss;
 
-					owner->getZoneServer()->getPlayerManager()->awardExperience(target, "jedi_general", xpLoss, true);
+					playerManager->awardExperience(target, "jedi_general", xpLoss, true, 1.0f, playerManager->getApplyGlobalXpMultiplierToJediDeathLoss());
 					StringIdChatParameter message("base_player","prose_revoke_xp");
 					message.setDI(xpLoss * -1);
 					message.setTO("exp_n", "jedi_general");

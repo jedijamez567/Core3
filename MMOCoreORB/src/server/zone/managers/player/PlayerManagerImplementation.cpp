@@ -250,6 +250,13 @@ void PlayerManagerImplementation::loadLuaConfig() {
 	baseStoredShips = lua->getGlobalInt("baseStoredShips");
 	vehicleCallDelay = lua->getGlobalInt("vehicleCallDelay");
 
+	applyGlobalXpMultiplierToJediDeathLoss = lua->getGlobalBoolean("applyGlobalXpMultiplierToJediDeathLoss");
+	jediDeathXpLossPercent = lua->getGlobalFloat("jediDeathXpLossPercent");
+	jediDeathBountyXpLossCreditsMultiplier = lua->getGlobalInt("jediDeathBountyXpLossCreditsMultiplier");
+	jediDeathBountyXpLossMin = lua->getGlobalInt("jediDeathBountyXpLossMin");
+	jediDeathBountyXpLossMax = lua->getGlobalInt("jediDeathBountyXpLossMax");
+	jediDeathForceReviveXpLoss = lua->getGlobalInt("jediDeathForceReviveXpLoss");
+
 	veteranRewardAdditionalMilestones = lua->getGlobalInt("veteranRewardAdditionalMilestones");
 
 	LuaObject rewardMilestonesLua = lua->getGlobalObject("veteranRewardMilestones");
@@ -1779,7 +1786,7 @@ void PlayerManagerImplementation::sendPlayerToCloner(CreatureObject* player, uin
 	// Jedi experience loss.
 	if (ghost->getJediState() >= 2) {
 		int jediXpCap = ghost->getXpCap("jedi_general");
-		int xpLoss = (int)(jediXpCap * -0.05);
+		int xpLoss = (int)(jediXpCap * -jediDeathXpLossPercent);
 		int curExp = ghost->getExperience("jedi_general");
 
 		int negXpCap = -10000000; // Cap on negative jedi experience
@@ -1787,7 +1794,7 @@ void PlayerManagerImplementation::sendPlayerToCloner(CreatureObject* player, uin
 		if ((curExp + xpLoss) < negXpCap)
 			xpLoss = negXpCap - curExp;
 
-		awardExperience(player, "jedi_general", xpLoss, true);
+		awardExperience(player, "jedi_general", xpLoss, true, 1.0f, applyGlobalXpMultiplierToJediDeathLoss);
 		StringIdChatParameter message("base_player","prose_revoke_xp");
 		message.setDI(xpLoss * -1);
 		message.setTO("exp_n", "jedi_general");
