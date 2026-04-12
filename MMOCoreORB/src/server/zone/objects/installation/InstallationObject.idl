@@ -7,6 +7,7 @@ package server.zone.objects.installation;
 import system.util.SortedVector;
 import engine.service.proto.BasePacket;
 import server.zone.objects.structure.StructureObject;
+import server.zone.objects.tangible.TangibleObject;
 import server.zone.objects.creature.CreatureObject;
 import server.zone.packets.scene.AttributeListMessage;
 include templates.SharedObjectTemplate;
@@ -24,7 +25,7 @@ import server.zone.objects.tangible.wearables.ArmorObject;
 class InstallationObject extends StructureObject {
 	protected transient SyncrhonizedUiListenInstallationTask syncUiTask;
 
-	protected boolean operating;
+	protected boolean active;
 
 	@dereferenced
 	protected transient SortedVector<CreatureObject> operatorList;
@@ -54,7 +55,7 @@ class InstallationObject extends StructureObject {
 
 		super.closeobjects = new CloseObjectsVector();
 		super.closeobjects.setNoDuplicateInsertPlan();
-		operating = false;
+		active = false;
 
 		installationType = 0;
 		extractionRemainder = 0;
@@ -106,14 +107,13 @@ class InstallationObject extends StructureObject {
 	public native void updateResourceContainerQuantity(ResourceContainer container, int newQuantity, boolean notifyClient = true);
 
 	@preLocked
-	public abstract native void setOperating(boolean operating, boolean notifyClient = true);
+	public abstract native void setActive(boolean value, boolean notifyClient = true);
 
 	@preLocked
 	public native void activateUiSync();
 
 	@dirty
 	public abstract void updateOperators() {
-
 	}
 
 	@preLocked
@@ -184,8 +184,8 @@ class InstallationObject extends StructureObject {
 	}
 
 	@read
-	public boolean isOperating() {
-		return operating;
+	public boolean isActive() {
+		return active;
 	}
 
 	@read
@@ -238,7 +238,7 @@ class InstallationObject extends StructureObject {
 	//public native void setCombatState();
 
 	@dirty
-	public native boolean isAggressiveTo(CreatureObject object);
+	public native boolean isAggressiveTo(TangibleObject object);
 
 	/**
 	* Evaluates if this can be attacked by object
@@ -250,7 +250,7 @@ class InstallationObject extends StructureObject {
 	public native boolean isAttackableBy(CreatureObject object);
 
 	@preLocked
-	public native void createChildObjects();
+	public abstract native void createChildObjects();
 
 	@read
 	public native float getHitChance();

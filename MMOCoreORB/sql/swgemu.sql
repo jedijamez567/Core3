@@ -2102,7 +2102,7 @@ UNLOCK TABLES;
 DROP TABLE IF EXISTS `swgemu`.`sessions`;
 CREATE TABLE  `swgemu`.`sessions` (
   `account_id` int(10) unsigned NOT NULL DEFAULT '0',
-  `session_id` int(10) unsigned NOT NULL,
+  `session_id` varchar(64) NOT NULL,
   `ip` varchar(15) NOT NULL,
   `expires` datetime NOT NULL,
   PRIMARY KEY (`account_id`) USING BTREE
@@ -13554,6 +13554,11 @@ CREATE TABLE  `swgemu`.`account_ips` (
 ) ENGINE=MyISAM AUTO_INCREMENT=1099 DEFAULT CHARSET=latin1;
 
 ALTER TABLE `swgemu`.`deleted_characters` ADD COLUMN `db_deleted` BOOLEAN  NOT NULL DEFAULT 0 AFTER `creation_date`;
+
+-- Newer versions require these to have defaults
+ALTER TABLE `characters` MODIFY COLUMN `creation_date` timestamp DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE `characters_dirty` MODIFY COLUMN `creation_date` timestamp DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE `deleted_characters` MODIFY COLUMN `creation_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
 /*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;

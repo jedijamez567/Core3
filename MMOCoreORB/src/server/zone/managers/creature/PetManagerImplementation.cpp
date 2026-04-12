@@ -9,13 +9,14 @@
 #include "server/zone/objects/creature/ai/DroidObject.h"
 #include "server/zone/objects/creature/ai/Creature.h"
 #include "server/zone/objects/creature/events/PetIncapacitationRecoverTask.h"
-#include "server/zone/objects/intangible/tasks/PetControlDeviceStoreObjectTask.h"
+#include "server/zone/objects/intangible/tasks/PetControlDeviceStoreTask.h"
 #include "server/zone/objects/intangible/PetControlDevice.h"
 #include "server/zone/objects/intangible/tasks/EnqueuePetCommand.h"
 #include "templates/datatables/DataTableIff.h"
 #include "templates/datatables/DataTableRow.h"
 #include "server/chat/ChatManager.h"
 #include "server/zone/objects/player/FactionStatus.h"
+#include "server/zone/objects/creature/commands/QueueCommand.h"
 
 void PetManagerImplementation::loadLuaConfig() {
 	info("Loading configuration file.", true);
@@ -274,7 +275,9 @@ void PetManagerImplementation::handleChat(CreatureObject* speaker, AiAgent* pet,
 
 		Locker plocker(pcd, speaker);
 		pcd->setLastCommander(speaker);
-		pcd->setLastCommand(command);
+
+		if (command != GROUP)
+			pcd->setLastCommand(command);
 	}
 }
 
@@ -467,18 +470,26 @@ bool PetManagerImplementation::handleCommandTraining(CreatureObject* speaker, Ai
 
 void PetManagerImplementation::enqueuePetCommand(CreatureObject* player, AiAgent* pet, uint32 command, const String& args, bool selfTarget) {
 	uint64 targetID;
-	if (selfTarget)
+
+	if (selfTarget) {
 		targetID = player->getObjectID();
-	else
+	} else {
 		targetID = player->getTargetID();
+	}
 
 	// CreatureObject* pet, uint32 command, const String& args, uint64 target, int priority = -1
-	EnqueuePetCommand* enqueueCommand = new EnqueuePetCommand(pet, command, args, targetID, 1);
-	enqueueCommand->execute();
+	EnqueuePetCommand* enqueueCommand = new EnqueuePetCommand(pet, command, args, targetID, QueueCommand::NOCOMBATQUEUE);
+
+	if (enqueueCommand == nullptr) {
+		return;
+	}
+
+	enqueueCommand->schedule(50);
 }
 
 void PetManagerImplementation::enqueueOwnerOnlyPetCommand(CreatureObject* player, AiAgent* pet, uint32 command, const String& args) {
 	ManagedReference<CreatureObject*> linkedCreature = pet->getLinkedCreature().get();
+
 	if (linkedCreature == nullptr)
 		return;
 
@@ -487,8 +498,8 @@ void PetManagerImplementation::enqueueOwnerOnlyPetCommand(CreatureObject* player
 		return;
 
 	// CreatureObject* pet, uint32 command, const String& args, uint64 target, int priority = -1
-	EnqueuePetCommand* enqueueCommand = new EnqueuePetCommand(pet, command, args, player->getTargetID(), 1);
-	enqueueCommand->execute();
+	EnqueuePetCommand* enqueueCommand = new EnqueuePetCommand(pet, command, args, player->getTargetID(), QueueCommand::NOCOMBATQUEUE);
+	enqueueCommand->schedule(50);
 }
 
 int PetManagerImplementation::notifyDestruction(TangibleObject* destructor, AiAgent* destructedObject, int condition, bool isCombatAction) {
@@ -598,7 +609,7 @@ void PetManagerImplementation::killPet(TangibleObject* attacker, AiAgent* pet, b
 			ManagedReference<CreatureObject*> owner = zoneServer->getObject(pet->getCreatureLinkID()).castTo<CreatureObject*>();
 
 			if (owner != nullptr) {
-				Reference<PetControlDeviceStoreObjectTask*> task = new PetControlDeviceStoreObjectTask(petControlDevice, owner, true);
+				Reference<PetControlDeviceStoreTask*> task = new PetControlDeviceStoreTask(petControlDevice, owner, true);
 				task->execute();
 			}
 

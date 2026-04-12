@@ -43,6 +43,9 @@ namespace area {
 		int setPvpArea(lua_State* L);
 		int isPvpArea(lua_State* L);
 
+		int setOvertOnlyArea(lua_State* L);
+		int isOvertOnlyArea(lua_State* L);
+
 		int setRebelOnlyArea(lua_State* L);
 		int isRebelOnlyArea(lua_State* L);
 
@@ -57,6 +60,14 @@ namespace area {
 
 		int setLockedArea(lua_State* L);
 		int isLockedArea(lua_State* L);
+
+		int setCampingArea(lua_State* L);
+		int isCampingArea(lua_State* L);
+
+		int setNoDuelArea(lua_State* L);
+		int isNoDuelArea(lua_State* L);
+
+		int getAreaName(lua_State* L);
 	private:
 		ActiveArea* realObject;
 	};

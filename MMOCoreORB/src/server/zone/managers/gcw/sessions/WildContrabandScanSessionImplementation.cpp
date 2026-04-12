@@ -27,9 +27,11 @@ int WildContrabandScanSessionImplementation::initializeSession() {
 
 	ManagedReference<Zone*> zone = player->getZone();
 
-	if (zone == nullptr || zone->getGCWManager() == nullptr) {
+	if (zone == nullptr) {
 		return false;
 	}
+
+	Locker lock(player);
 
 	if (wildContrabandScanTask == nullptr) {
 		wildContrabandScanTask = new WildContrabandScanTask(player);
@@ -39,7 +41,10 @@ int WildContrabandScanSessionImplementation::initializeSession() {
 		wildContrabandScanTask->schedule(TASKDELAY);
 	}
 
-	player->updateCooldownTimer("crackdown_scan", zone->getGCWManager()->getCrackdownPlayerScanCooldown());
+	GCWManager* gcwMan = zone->getGCWManager();
+
+	if (gcwMan != nullptr)
+		player->updateCooldownTimer("crackdown_scan", gcwMan->getCrackdownPlayerScanCooldown() * 1000);
 
 	if (player->getActiveSession(SessionFacadeType::WILDCONTRABANDSCAN) != nullptr) {
 		player->dropActiveSession(SessionFacadeType::WILDCONTRABANDSCAN);
@@ -47,7 +52,9 @@ int WildContrabandScanSessionImplementation::initializeSession() {
 
 	player->addActiveSession(SessionFacadeType::WILDCONTRABANDSCAN, _this.getReferenceUnsafeStaticCast());
 
-	landingCoordinates = getLandingCoordinates(zone, player);
+	Vector3 playerPos = player->getPosition();
+
+	landingCoordinates = getLandingCoordinates(zone, player, playerPos);
 
 	return true;
 }
@@ -56,6 +63,7 @@ int WildContrabandScanSessionImplementation::cancelSession() {
 	ManagedReference<CreatureObject*> player = weakPlayer.get();
 
 	AiAgent* droid = getDroid();
+
 	if (droid != nullptr) {
 		Locker dlocker(droid);
 		droid->destroyObjectFromWorld(true);
@@ -93,6 +101,7 @@ void WildContrabandScanSessionImplementation::runWildContrabandScan() {
 	}
 
 	AiAgent* droid = getDroid();
+
 	if (droid != nullptr && droid->isInCombat()) {
 		scanState = INCOMBAT;
 	}
@@ -117,7 +126,7 @@ void WildContrabandScanSessionImplementation::runWildContrabandScan() {
 				droid->registerObserver(ObserverEventType::DEFENDERADDED, probotObserver);
 				droid->setAITemplate();
 
-				droid->addCreatureFlag(CreatureFlag::FOLLOW);
+				droid->addObjectFlag(ObjectFlag::FOLLOW);
 				droid->setFollowObject(player);
 
 				scanState = CLOSINGIN;
@@ -177,9 +186,11 @@ void WildContrabandScanSessionImplementation::runWildContrabandScan() {
 		if (timeLeft <= 0) {
 			int numberOfContrabandItems = 0;
 			GCWManager* gcwManager = zone->getGCWManager();
+
 			if (gcwManager != nullptr) {
 				numberOfContrabandItems = gcwManager->countContrabandItems(player);
 			}
+
 			if (numberOfContrabandItems > 0) {
 				sendSystemMessage(player, "probe_scan_positive");
 				scanState = TAKEOFF;
@@ -190,27 +201,30 @@ void WildContrabandScanSessionImplementation::runWildContrabandScan() {
 
 				if (spawnPoint != nullptr) {
 					Reference<Task*> lambdaTask = new LambdaShuttleWithReinforcementsTask(player, Factions::FACTIONIMPERIAL, 1, "@imperial_presence/contraband_search:containment_team_imperial", *spawnPoint->getPosition(), *spawnPoint->getDirection(), LambdaShuttleWithReinforcementsTask::LAMBDASHUTTLESCAN);
-					lambdaTask->schedule(1);
+					lambdaTask->schedule(1000);
 				} else {
 					float spawnDirection = player->getDirection()->getRadians() + Math::PI;
 					if (spawnDirection >= 2 * Math::PI) {
 						spawnDirection -= 2 * Math::PI;
 					}
+
 					Reference<Task*> lambdaTask = new LambdaShuttleWithReinforcementsTask(player, Factions::FACTIONIMPERIAL, 1, "@imperial_presence/contraband_search:containment_team_imperial", landingCoordinates, Quaternion(Vector3(0, 1, 0), spawnDirection), LambdaShuttleWithReinforcementsTask::LAMBDASHUTTLESCAN);
-					lambdaTask->schedule(1);
+					lambdaTask->schedule(1000);
 				}
 
 				AiAgent* droid = getDroid();
+
 				if (droid != nullptr && !droid->isDead()) {
 					Locker dlocker(droid);
 					PatrolPoint* homeLocation = droid->getHomeLocation();
 
-					droid->removeCreatureFlag(CreatureFlag::FOLLOW);
+					droid->removeObjectFlag(ObjectFlag::FOLLOW);
 					droid->clearPatrolPoints();
 
 					droid->setMovementState(AiAgent::PATROLLING);
+					droid->setAITemplate();
+
 					droid->setNextPosition(homeLocation->getPositionX(), homeLocation->getPositionZ(), homeLocation->getPositionY());
-					droid->stopWaiting();
 
 					droid->showFlyText("imperial_presence/contraband_search", "probot_support_fly", 255, 0, 0);
 				}
@@ -224,6 +238,7 @@ void WildContrabandScanSessionImplementation::runWildContrabandScan() {
 	}
 	case INCOMBAT: {
 		AiAgent* droid = getDroid();
+
 		if (droid != nullptr) {
 			if (!droid->isInCombat() && !droid->isDead()) {
 				scanState = TAKEOFF;
@@ -239,11 +254,24 @@ void WildContrabandScanSessionImplementation::runWildContrabandScan() {
 	case TAKEOFF:
 		if (timeLeft <= 0) {
 			scanState = TAKINGOFF;
-			timeLeft = 7;
+			timeLeft = 12;
 			AiAgent* droid = getDroid();
+
 			if (droid != nullptr) {
-				Locker dlocker(droid);
-				droid->setPosture(CreaturePosture::SITTING, true); // Takeoff
+				Locker dlocker(droid, player);
+
+				Vector3 playerPos = player->getWorldPosition();
+				float diffX = playerPos.getX();
+				float diffY = playerPos.getY();
+
+				float angle = atan2(diffY, diffX);
+				float newX = droid->getWorldPositionX() + (cos(angle) * 60.f);
+				float newY = droid->getWorldPositionY() + (sin(angle) * 60.f);
+
+				droid->setMovementState(AiAgent::PATROLLING);
+				droid->setAITemplate();
+
+				droid->setNextPosition(newX, droid->getPositionZ(), newY, nullptr);
 			} else {
 				scanState = FINISHED; // Probot is destroyed.
 			}
@@ -252,6 +280,13 @@ void WildContrabandScanSessionImplementation::runWildContrabandScan() {
 	case TAKINGOFF:
 		if (timeLeft <= 0) {
 			scanState = FINISHED;
+		} else if (timeLeft < 7 && droid->getPosture() == CreaturePosture::UPRIGHT) {
+			AiAgent* droid = getDroid();
+
+			if (droid != nullptr) {
+				Locker dlocker(droid);
+				droid->setPosture(CreaturePosture::SITTING, true); // Takeoff
+			}
 		}
 		break;
 	default:
@@ -276,18 +311,23 @@ void WildContrabandScanSessionImplementation::landProbeDroid(Zone* zone, Creatur
 	timeLeft = 3;
 }
 
-Vector3 WildContrabandScanSessionImplementation::getLandingCoordinates(Zone* zone, CreatureObject* player) {
-	if (zone == nullptr) {
-		return player->getPosition();
+Vector3 WildContrabandScanSessionImplementation::getLandingCoordinates(Zone* zone, CreatureObject* player, Vector3& playerPos) {
+	if (zone == nullptr || player == nullptr) {
+		return playerPos;
 	}
 
 	PlanetManager* planetManager = zone->getPlanetManager();
 
 	if (planetManager == nullptr) {
-		return player->getPosition();
+		return playerPos;
 	}
 
-	return planetManager->getInSightSpawnPoint(player, 30, 120, 15);
+	Vector3 coords = planetManager->getInSightSpawnPoint(player, 30, 120, 25);
+	float z = CollisionManager::getWorldFloorCollision(coords.getX(), coords.getY(), coords.getZ(), zone, true);
+
+	coords.setZ(z);
+
+	return coords;
 }
 
 void WildContrabandScanSessionImplementation::sendSystemMessage(CreatureObject* player, const String& messageName) {

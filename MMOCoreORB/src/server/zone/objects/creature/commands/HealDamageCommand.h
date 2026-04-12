@@ -67,17 +67,15 @@ public:
 	void doAnimationsRange(CreatureObject* creature, CreatureObject* creatureTarget, int oid, float range) const {
 		String crc;
 
-		if (range < 10.0f) {
-			crc = "throw_grenade_near_healing";
-		}
-		else if (10.0f <= range && range < 20.0f) {
-			crc = "throw_grenade_medium_healing";
-		}
-		else {
-			crc = "throw_grenade_far_healing";
+		if (range < 20.0f) {
+			crc = "throw_grenade_near_healing_longrange";
+		} else if (range >= 20.0f && range < 40.0f) {
+			crc = "throw_grenade_medium_healing_longrange";
+		} else {
+			crc = "throw_grenade_far_healing_longrange";
 		}
 
-		CombatAction* action = new CombatAction(creature, creatureTarget,  crc.hashCode(), 1, 0L);
+		CombatAction* action = new CombatAction(creature, creatureTarget, crc.hashCode(), 1, 0L);
 		creature->broadcastMessage(action, true);
 	}
 
@@ -122,8 +120,6 @@ public:
 		if (!creatureTarget->hasDamage(CreatureAttribute::HEALTH) && !creatureTarget->hasDamage(CreatureAttribute::ACTION)) {
 			return false;
 		}
-
-		PlayerManager* playerManager = server->getPlayerManager();
 
 		if (creature != creatureTarget && !CollisionManager::checkLineOfSight(creature, creatureTarget)) {
 			return false;
@@ -325,7 +321,7 @@ public:
 
 			CloseObjectsVector* closeObjectsVector = (CloseObjectsVector*) areaCenter->getCloseObjects();
 
-			SortedVector<QuadTreeEntry*> closeObjects;
+			SortedVector<TreeEntry*> closeObjects;
 			closeObjectsVector->safeCopyReceiversTo(closeObjects, CloseObjectsVector::CREOTYPE);
 
 			for (int i = 0; i < closeObjects.size(); i++) {

@@ -3,6 +3,8 @@ kreezo = Creature:new {
 	socialGroup = "rebel",
 	faction = "rebel",
 	mobType = MOB_NPC,
+	planetMapCategory = "trainer",
+	planetMapSubCategory = "trainer_pilot_rebel",
 	level = 100,
 	chanceHit = 1,
 	damageMin = 645,
@@ -23,7 +25,7 @@ kreezo = Creature:new {
 	ferocity = 0,
 	pvpBitmask = NONE,
 	creatureBitmask = PACK,
-	optionsBitmask = AIENABLED,
+	optionsBitmask = AIENABLED + CONVERSABLE + JTLINTERESTING,
 	diet = HERBIVORE,
 
 	templates = {"object/mobile/space_rebel_tier1_corellia_kreezo.iff"},
@@ -33,8 +35,8 @@ kreezo = Creature:new {
 	-- Unarmed should be put on secondary unless the mobile doesn't use weapons, in which case "unarmed" should be put primary and "none" as secondary
 	primaryWeapon = "unarmed",
 	secondaryWeapon = "none",
-	conversationTemplate = "",
-	
+	conversationTemplate = "kreezo_convo",
+
 	-- primaryAttacks and secondaryAttacks should be separate skill groups specific to the weapon type listed in primaryWeapon and secondaryWeapon
 	-- Use merge() to merge groups in creatureskills.lua together. If a weapon is set to "none", set the attacks variable to empty brackets
 	primaryAttacks = {},

@@ -12,22 +12,23 @@
 
 class PlayersNearYouMessage : public ObjectControllerMessage {
 public:
-	PlayersNearYouMessage(CreatureObject* creo) 
-: ObjectControllerMessage(creo->getObjectID(), 0x0B, 0x1E7) {
+	PlayersNearYouMessage(CreatureObject* creo) : ObjectControllerMessage(creo->getObjectID(), 0x0B, 0x1E7) {
 		insertInt(0); // No players.
 	}
 
 	void addFoundPlayer(CreatureObject* player) {
-		// Bitmask.
+		// Player Bitmasks
 		PlayerObject* ghost = player->getPlayerObject();
 
-		uint32 playerBitmask = 0;
+		if (ghost != nullptr) {
+			insertInt(0x04);
 
-		if (ghost != nullptr)
-			playerBitmask = ghost->getCharacterBitmask();
+			const PlayerBitmasks* playerBits = ghost->getPlayerBitmasks();
 
-		insertInt(1);
-		insertInt(playerBitmask); // Flags bitmask.
+			for (int i = 0; i < 4; ++i) {
+				insertInt(playerBits->getBitmask(i));
+			}
+		}
 
 		insertUnicode(player->getDisplayedName()); // Player name.
 
@@ -42,12 +43,25 @@ public:
 
 		if (zone != nullptr) {
 			zoneName = zone->getZoneName();
+		}
 
-			PlanetManager* planetManager = zone->getPlanetManager();
-			CityRegion* cityRegion = planetManager->getRegionAt(player->getWorldPositionX(), player->getWorldPositionY());
+		if (player->getCityRegion() != nullptr) {
+			CityRegion* cityRegion = player->getCityRegion().get();
 
 			if (cityRegion != nullptr)
-				regionName = cityRegion->getRegionName();
+				regionName =  cityRegion->getCityRegionName();
+		} else {
+			SortedVector<ManagedReference<ActiveArea*> >* areas = player->getActiveAreas();
+
+			for (int i = 0; i < areas->size(); i++) {
+				ActiveArea* area = areas->get(i);
+
+				if (area == nullptr || !area->isNamedRegion())
+					continue;
+
+				regionName = area->getAreaName();
+				break;
+			}
 		}
 
 		insertAscii(regionName); //Region Name
@@ -67,7 +81,8 @@ public:
 		if (ghost != nullptr)
 			title = ghost->getTitle();
 
-		insertAscii(title); // Profession Title
+		 // Profession Title
+		insertAscii(title);
 	}
 
 	void insertPlayerCounter(uint32 foundCount) {

@@ -1,13 +1,14 @@
 spawn_area = SharedObjectTemplate:new {
+	gameObjectType = 33554436,
+
 	clientTemplateFileName = "",
 	planetMapCategory = "",
 	planetMapSubCategory = "",
 	autoRegisterWithPlanetMap = 1,
 
-	zoneComponent = "ZoneComponent",
+	groundZoneComponent = "GroundZoneComponent",
 	objectMenuComponent = "ObjectMenuComponent",
-	containerComponent = "ContainerComponent",
-	gameObjectType = 33554436
+	containerComponent = "ContainerComponent"
 }
 
 ObjectTemplates:addTemplate(spawn_area, "object/spawn_area.iff")

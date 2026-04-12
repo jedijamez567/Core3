@@ -43,6 +43,8 @@
 
 object_tangible_ship_crafted_chassis_xwing_customization_kit = object_tangible_ship_crafted_chassis_shared_xwing_customization_kit:new {
 
+	objectMenuComponent = "StarshipPaintKitObjectMenuComponent",
+	gameObjectType = 8258;
 
 	numberExperimentalProperties = {1, 1},
 	experimentalProperties = {"XX", "XX"},

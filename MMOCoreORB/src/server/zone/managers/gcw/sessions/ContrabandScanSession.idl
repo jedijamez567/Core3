@@ -8,9 +8,7 @@ import server.zone.objects.creature.ai.AiAgent;
 import engine.core.Task;
 
 class ContrabandScanSession extends Facade {
-
-	private static final int CONTRABANDSCANCOOLDOWN = 90000; // Time should be at least a few seconds longer than the longest time a scan takes. Current maximum scan time is 80 s.
-	private static final int SCANINITIATECHANCE = 8; // 1/8 chance to initiate scan - 12.5 % chance.
+	private static final int SCANINITIATECHANCE = 12; // 1/12 chance to initiate scan - 8.3 % chance.
 	private static final int TASKDELAY = 2000; // 2s delay.
 	private static final int IMMEDIATELY = 1; // Minimum delay.
 	private static final int SCANTIME = 10; // 10 iterations = 10 s
@@ -105,12 +103,14 @@ class ContrabandScanSession extends Facade {
 
 	private native string getFactionStringId(CreatureObject player, final string imperial, final string rebel);
 	private native void sendScannerChatMessage(Zone zone, AiAgent scanner, CreatureObject player, final string imperial, final string rebel);
+	private native void sendBarkChatMessage(AiAgent scanner, CreatureObject player);
+	private native void sendStormtrooperMessage(AiAgent scanner, final string message);
 	private native void sendPersonalizedScannerChatMessage(Zone zone, AiAgent scanner, CreatureObject player, final string imperial, final string rebel);
 	private native void sendSystemMessage(AiAgent scanner, CreatureObject player, final string imperial, final string rebel);
 	private native string dependingOnJediSkills(CreatureObject player, final string novice, final string lightSide, final string darkSide);
 	private native boolean playerTriesToAvoidScan(AiAgent scanner, CreatureObject player);
 	private native void scannerRequestsPlayerToReturn(Zone zone, AiAgent scanner, CreatureObject player);
-	private native void checkIfPlayerShouldBeScanned(CreatureObject player);
+	private native void checkIfPlayerShouldBeScanned(CreatureObject player, AiAgent scanner);
 	private native void initiateScan(Zone zone, AiAgent scanner, CreatureObject player);
 	private native void checkPlayerFactionRank(Zone zone, AiAgent scanner, CreatureObject player);
 	private native void performJediMindTrick(Zone zone, AiAgent scanner, CreatureObject player);
@@ -129,4 +129,5 @@ class ContrabandScanSession extends Facade {
 	private native void calculateSmugglingSuccess(CreatureObject player);
 	private native int getSmugglerAvoidanceChance(CreatureObject creature);
 	private native void callInLambdaShuttle(AiAgent scanner, CreatureObject player, int difficulty, final string landingMessage);
+	private native void moveAlongMessage(AiAgent scanner);
 }

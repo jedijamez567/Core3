@@ -75,6 +75,7 @@ namespace player {
 		int clearCompletedQuestsBit(lua_State* L);
 		int hasAbility(lua_State* L);
 		int addAbility(lua_State* L);
+		int removeAbility(lua_State* L);
 		int getExperience(lua_State* L);
 		int addEventPerk(lua_State* L);
 		int getEventPerkCount(lua_State* L);
@@ -96,10 +97,25 @@ namespace player {
 		int setFrsRank(lua_State* L);
 		int getFrsRank(lua_State* L);
 		int getFrsCouncil(lua_State* L);
+		int showCouncilRank(lua_State* L);
 		int startSlicingSession(lua_State* L);
 		int setVisibility(lua_State* L);
 		int getPlayedTimeString(lua_State* L);
 		int getAccountID(lua_State* L);
+		int hasPvpTef(lua_State* L);
+		int hasGcwTef(lua_State* L);
+		int getPvpRating(lua_State* L);
+
+		// JTL
+		int incrementPilotTier(lua_State* L);
+		int resetPilotTier(lua_State* L);
+		int setPilotTier(lua_State* L);
+		int getPilotTier(lua_State* L);
+		int isSquadronType(lua_State* L);
+		int setSquadronType(lua_State* L);
+		int getSquadronType(lua_State* L);
+		int addDroidCommand(lua_State* L);
+		int removeDroidCommands(lua_State* L);
 
 	private:
 		// The pointer to the 'real object' defined in object.cc

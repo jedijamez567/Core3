@@ -3,6 +3,8 @@ v3_fx = Creature:new {
 	socialGroup = "rebel",
 	faction = "rebel",
 	mobType = MOB_NPC,
+	planetMapCategory = "trainer",
+	planetMapSubCategory = "trainer_pilot_rebel",
 	level = 100,
 	chanceHit = 1,
 	damageMin = 645,
@@ -23,7 +25,7 @@ v3_fx = Creature:new {
 	ferocity = 0,
 	pvpBitmask = NONE,
 	creatureBitmask = PACK,
-	optionsBitmask = AIENABLED,
+	optionsBitmask = AIENABLED + JTLINTERESTING,
 	diet = HERBIVORE,
 
 	templates = {"object/mobile/space_rebel_tier1_naboo_v3fx.iff"},
@@ -34,7 +36,7 @@ v3_fx = Creature:new {
 	primaryWeapon = "unarmed",
 	secondaryWeapon = "none",
 	conversationTemplate = "",
-	
+
 	-- primaryAttacks and secondaryAttacks should be separate skill groups specific to the weapon type listed in primaryWeapon and secondaryWeapon
 	-- Use merge() to merge groups in creatureskills.lua together. If a weapon is set to "none", set the attacks variable to empty brackets
 	primaryAttacks = {},

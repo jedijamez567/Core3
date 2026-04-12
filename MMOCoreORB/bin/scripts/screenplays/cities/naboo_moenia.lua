@@ -59,6 +59,9 @@ NabooMoeniaScreenPlay = CityScreenPlay:new {
 		{"medic",60,54.4,-0.5,42.7,-120,4215413, "npc_consoling"},
 		{"trainer_shipwright",60,-0.4,0.6,67.1,-177,4215410, "neutral"},
 
+		--JTL Greeter
+		{"bertos_goodner", 60, 4803.3,4.1,-4697.6, 113, 0, ""},
+
 		{"informant_npc_lvl_1",0,4652,3.8,-4749,0,0, ""},
 		{"informant_npc_lvl_1",0,4744,3.8,-4847,0,0, ""},
 		{"informant_npc_lvl_1",0,4825,3.8,-4829, 235,0, ""},
@@ -98,8 +101,12 @@ NabooMoeniaScreenPlay = CityScreenPlay:new {
 		{"rebel_recruiter",0,-29,-0.89,-1.2,74,119, ""},
 		{"informant_npc_lvl_2",0,-2.2226,-0.894992,5.90785,90,111, ""},
 
-		--hotel
+		--Hotel
 		{"bartender",60,20.2,1.6,12.3,-180,1717470, "conversation"},
+
+		--Gazebo
+		{"v3_fx", 60, 4764.2, 6.1, -4795.2, 133, 0, "neutral"},
+		{"kiizete", 60, 4766.36, 6.1, -4795.8, 172, 0, "neutral"},
 
 		--Guild Hall 4923 -4783
 		{"trainer_artisan",0,-0.0177415,1.13306,-13.3088,0,1717546, ""},
@@ -158,10 +165,14 @@ function NabooMoeniaScreenPlay:spawnMobiles()
 				CreatureObject(pMobile):setMoodString(mob[8])
 			end
 
-			AiAgent(pMobile):addCreatureFlag(AI_STATIC)
+			AiAgent(pMobile):addObjectFlag(AI_STATIC)
 
 			if CreatureObject(pMobile):getPvpStatusBitmask() == 0 then
 				CreatureObject(pMobile):clearOptionBit(AIENABLED)
+			end
+
+			if mob[1] == "bertos_goodner" then
+				createEvent(10000, "NabooMoeniaScreenPlay", "startDancingEvent", pMobile, "")
 			end
 		end
 	end
@@ -173,7 +184,7 @@ function NabooMoeniaScreenPlay:spawnMobiles()
 	spawnMobile(self.planet, "mummer_punk", 300, getRandomNumber(10) + 4856.8, 4.2, getRandomNumber(10) + -4701.5, getRandomNumber(360), 0)
 
 	--newb grind starter spawns
-	spawnMobile(self.planet, "diseased_nuna", 300, getRandomNumber(10) + 4599.2, 5.0, getRandomNumber(10) + -4806.4, getRandomNumber(360), 0)
+	--[[spawnMobile(self.planet, "diseased_nuna", 300, getRandomNumber(10) + 4599.2, 5.0, getRandomNumber(10) + -4806.4, getRandomNumber(360), 0)
 	spawnMobile(self.planet, "diseased_nuna", 300, getRandomNumber(10) + 4599.2, 5.0, getRandomNumber(10) + -4806.4, getRandomNumber(360), 0)
 	spawnMobile(self.planet, "diseased_nuna", 300, getRandomNumber(10) + 4599.2, 5.0, getRandomNumber(10) + -4806.4, getRandomNumber(360), 0)
 	spawnMobile(self.planet, "gungan_hermit", 300, getRandomNumber(10) + 4782, 4.2, getRandomNumber(10) + -4526, getRandomNumber(360), 0)
@@ -192,5 +203,29 @@ function NabooMoeniaScreenPlay:spawnMobiles()
 	spawnMobile(self.planet, "mott", 300, getRandomNumber(10) + 4577, 6.5, getRandomNumber(10) + -4622, getRandomNumber(360), 0)
 	spawnMobile(self.planet, "mummer_thug", 300, getRandomNumber(10) + 4681, 4.0, getRandomNumber(10) + -4730, getRandomNumber(360), 0)
 	spawnMobile(self.planet, "mummer_thug", 300, getRandomNumber(10) + 4681, 4.0, getRandomNumber(10) + -4730, getRandomNumber(360), 0)
-	spawnMobile(self.planet, "mummer_thug", 300, getRandomNumber(10) + 4681, 4.0, getRandomNumber(10) + -4730, getRandomNumber(360), 0)
+	spawnMobile(self.planet, "mummer_thug", 300, getRandomNumber(10) + 4681, 4.0, getRandomNumber(10) + -4730, getRandomNumber(360), 0)]]
+end
+
+function NabooMoeniaScreenPlay:startDancingEvent(pNpc)
+	if (pNpc == nil) then
+
+		return
+	end
+
+	local grooveNumber = math.random(1, 3)
+	local moodString = "groove_0" .. grooveNumber
+
+	CreatureObject(pNpc):setMoodString(moodString)
+
+	createEvent(math.random(9000, 12000), "NabooMoeniaScreenPlay", "stopDancingEvent", pNpc, "")
+end
+
+function NabooMoeniaScreenPlay:stopDancingEvent(pNpc)
+	if (pNpc == nil) then
+		return
+	end
+
+	CreatureObject(pNpc):setMoodString("calm")
+
+	createEvent(math.random(9000, 12000), "NabooMoeniaScreenPlay", "startDancingEvent", pNpc, "")
 end

@@ -130,7 +130,7 @@ public:
 
 				TransactionLog trx(TrxCode::ADMINCOMMAND, creature);
 				trx.addState("commandType", commandType);
-				if (lootManager->createLoot(trx, inventory, lootGroup, level)) {
+				if (lootManager->createLoot(trx, inventory, lootGroup, level) > 0) {
 					creature->info(true) << "/object creatloot " << lootGroup << " trxId: " << trx.getTrxID();
 					trx.commit(true);
 				} else {
@@ -174,10 +174,10 @@ public:
 					return GENERALERROR;
 
 				// Find all objects in range
-				SortedVector<QuadTreeEntry*> closeObjects;
+				SortedVector<TreeEntry*> closeObjects;
 				CloseObjectsVector* closeObjectsVector = (CloseObjectsVector*) creature->getCloseObjects();
 				if (closeObjectsVector == nullptr) {
-					zone->getInRangeObjects(creature->getPositionX(), creature->getPositionY(), range, &closeObjects, true);
+					zone->getInRangeObjects(creature->getPositionX(), creature->getPositionZ(), creature->getPositionY(), range, &closeObjects, true);
 				} else {
 					closeObjectsVector->safeCopyTo(closeObjects);
 				}
@@ -195,7 +195,7 @@ public:
 						if (inventory != nullptr) {
 							TransactionLog trx(creature, targetPlayer, nullptr, TrxCode::ADMINCOMMAND);
 							trx.addState("commandType", commandType);
-							if (lootManager->createLoot(trx, inventory, lootGroup, level)) {
+							if (lootManager->createLoot(trx, inventory, lootGroup, level) > 0) {
 								creature->info(true) << "/object creatlootarea " << lootGroup << " trxId: " << trx.getTrxID();
 								trx.commit(true);
 								targetPlayer->sendSystemMessage( "You have received a loot item!");
@@ -256,7 +256,7 @@ public:
 			creature->sendSystemMessage("SYNTAX: /object createarealoot <loottemplate> [<range>] [<level>]");
 			creature->sendSystemMessage("SYNTAX: /object checklooted");
 			creature->sendSystemMessage("SYNTAX: /object characterbuilder");
-                  
+
 			return INVALIDPARAMETERS;
 		}
 

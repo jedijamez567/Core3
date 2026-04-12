@@ -117,8 +117,9 @@ NabooTheedScreenPlay = CityScreenPlay:new {
 		{"informant_npc_lvl_1",0,-5436,6,4133,0,0, ""},
 		{"informant_npc_lvl_1",0,-5369,6,4178,0,0, ""},
 		{"informant_npc_lvl_1",0,-5477,6,4089,0,0, ""},
-		{"j1_po", 1, -4859, 6, 4156, 18, 0, ""},
-		{"kulton_woodle", 1, -4857.1, 6, 4155.7, 299, 0, ""},
+		{"j1_po", 1, -4859, 6, 4156, 18, 0, "neutral"},
+		{"kulton_woodle", 1, -4857.1, 6, 4155.7, 299, 0, "neutral"},
+		{"landau", 1, -5516.19, 6, 4404.77, 145, 0, "npc_imperial"},
 
 		{"junk_dealer", 0, -5884.3, 6, 4214.3, 83, 0, ""},
 
@@ -129,6 +130,7 @@ NabooTheedScreenPlay = CityScreenPlay:new {
 		{"trainer_1hsword",0,-5565,6,4304,84,0, ""},
 		{"trainer_2hsword",0,-5382,6,4327,180,0, ""},
 		{"trainer_architect",0,-4931,6,4020,39,0, ""},
+		{"trainer_armorsmith", 0, -12.7, 1.1, -0.7, 178, 1692092, ""},
 		{"trainer_artisan",0,-4946,6,4131,138,0, ""},
 		{"trainer_artisan",0,-5996.85,6,4287.56,69,0, ""},
 		{"trainer_bioengineer",0,-5017,6,4009,0,0, ""},
@@ -136,6 +138,9 @@ NabooTheedScreenPlay = CityScreenPlay:new {
 		{"trainer_brawler",0,-4858,6,4087,-47,0, ""},
 		{"trainer_brawler",0,-4684,6,3947,-71,0, ""},
 		{"trainer_chef",0,-4877,6,4065,0,0, ""},
+		{"trainer_combatmedic", 0, -16.8, 0.3, 9.7, 225, 1697364, ""},
+		{"trainer_combatmedic", 0, 30.6, 7.3, 6.0, 280, 1697368, ""},
+		{"trainer_doctor",0,17.4,0.3,0.8, 15, 1697360, ""},
 		{"trainer_doctor",0,-5038,6,4146,180,0, ""},
 		{"trainer_entertainer",0,-4840,6,4082,66,0, ""},
 		{"trainer_entertainer",0,-5834,6,4241,104,0, ""},
@@ -188,7 +193,17 @@ NabooTheedScreenPlay = CityScreenPlay:new {
 		{"chassis_dealer",60,-1.0,0.7,-72.2,50,1692101, "neutral"},
 		{"commoner_naboo", 60, -23.0, 0.7, -70.5, 190, 1692102, "conversation"},
 		{"commoner_naboo", 60, -24.1, 0.7, -71.7, 35, 1692102, "conversation"},
-		{"commoner_naboo", 60, -22.5, 0.7, -72.0, 350, 1692102, "conversation"}
+		{"commoner_naboo", 60, -22.5, 0.7, -72.0, 350, 1692102, "conversation"},
+
+		--Theed Palace
+		{"dinge", 60, 0.80, 12.01, 6.36, 0, 1688859, "neutral"},
+		{"kaydine", 60, 1.29, 21.0, -44.28, 1, 1688860, "neutral"},
+		{"dulios", 60, 40.41, 33.0, -93.75, -90, 1688867, "neutral"},
+		{"diness_imler", 60, -45.66, 33.0, -93.9, 90, 1688873, "neutral"},
+
+		{"nial_declann", 60, 30.37, 23.0, -32.39, -90, 1688861, "npc_imperial"},
+		{"tk_8h2", 60, 29.11, 23.0, -30.59, -129, 1688861, ""},
+		{"tk_9h4", 60, 29.34, 23.00, -34.46, -60, 1688861, ""}
 	}
 }
 
@@ -208,6 +223,10 @@ function NabooTheedScreenPlay:spawnSceneObjects()
 	--outside starport
 	spawnSceneObject(self.planet, "object/tangible/crafting/station/public_space_station.iff", -4830.96, 6, 4141.53, 0, math.rad(-140) )
 	spawnSceneObject(self.planet, "object/tangible/crafting/station/public_space_station.iff", -4886.07, 6, 4188.23, 0, math.rad(-140) )
+
+	-- Imperial Banners Near Commander Landau - Imperial JTL Coordinator
+	spawnSceneObject(self.planet, "object/tangible/gcw/flip_banner_onpole_imperial.iff", -5518.5, 6.0, 4406.1, 0, math.rad(-20))
+	spawnSceneObject(self.planet, "object/tangible/gcw/flip_banner_onpole_imperial.iff", -5515.0, 6.0, 4406.6, 0, 0)
 end
 
 function NabooTheedScreenPlay:spawnMobiles()
@@ -224,7 +243,7 @@ function NabooTheedScreenPlay:spawnMobiles()
 				CreatureObject(pMobile):setMoodString(mob[8])
 			end
 
-			AiAgent(pMobile):addCreatureFlag(AI_STATIC)
+			AiAgent(pMobile):addObjectFlag(AI_STATIC)
 
 			if CreatureObject(pMobile):getPvpStatusBitmask() == 0 then
 				CreatureObject(pMobile):clearOptionBit(AIENABLED)
@@ -238,6 +257,7 @@ function NabooTheedScreenPlay:spawnMobiles()
 	end
 
 	--Creatures
+	--[[
 	spawnMobile(self.planet, "flewt", 300, getRandomNumber(10) + -5195, 6, getRandomNumber(10) + 3988, getRandomNumber(360), 0)
 	spawnMobile(self.planet, "flewt", 300, getRandomNumber(10) + -5200, 6, getRandomNumber(10) + 3997, getRandomNumber(360), 0)
 	spawnMobile(self.planet, "flewt", 300, getRandomNumber(10) + -5207, 6, getRandomNumber(10) + 3992, getRandomNumber(360), 0)
@@ -307,13 +327,14 @@ function NabooTheedScreenPlay:spawnMobiles()
 	spawnMobile(self.planet, "mott_calf", 300, getRandomNumber(10) + -4946.78, 6, getRandomNumber(10) + 3650.67, getRandomNumber(360), 0)
 	spawnMobile(self.planet, "mott_calf", 300, getRandomNumber(10) + -4943.30, 6, getRandomNumber(10) + 3652.44, getRandomNumber(360), 0)
 	spawnMobile(self.planet, "mott_calf", 300, getRandomNumber(10) + -4939.35, 6, getRandomNumber(10) + 3653.82, getRandomNumber(360), 0)
-
+	]]
 	--Cantina
 	pNpc = spawnMobile(self.planet, "junk_dealer", 0, -5.8, -0.9, -20.9, -52, 96)
 	if pNpc ~= nil then
 		AiAgent(pNpc):setConvoTemplate("junkDealerArmsConvoTemplate")
 	end
 
+	--[[
 	--double waterfall island near Palace
 	spawnMobile(self.planet, "mott_calf", 600, getRandomNumber(10) + -5201.0, 6, getRandomNumber(10) + 4542.6, getRandomNumber(360), 0)
 	spawnMobile(self.planet, "mott_calf", 600, getRandomNumber(10) + -5195.0, 6, getRandomNumber(10) + 4537.4, getRandomNumber(360), 0)
@@ -321,4 +342,5 @@ function NabooTheedScreenPlay:spawnMobiles()
 	spawnMobile(self.planet, "flewt", 300, getRandomNumber(10) + -5176.4, 6, getRandomNumber(10) + 4612.2, getRandomNumber(360), 0)
 	spawnMobile(self.planet, "flewt", 300, getRandomNumber(10) + -5161.3, 6, getRandomNumber(10) + 4601.7, getRandomNumber(360), 0)
 	spawnMobile(self.planet, "flewt", 300, getRandomNumber(10) + -5193.3, 6, getRandomNumber(10) + 4610.0, getRandomNumber(360), 0)
+	]]
 end

@@ -97,7 +97,6 @@ CorelliaTyrenaScreenPlay = CityScreenPlay:new {
 		--{patrolPoints, template, x, z, y, direction, cell, mood, combatPatrol},
 
 		--Droids
-		{"cll8_1", "cll_8", -5050, 21, -2288, 145, 0, "", false},
 		{"eg6_1", "eg6_power_droid", -5605.25, 21, -2721.9, 155.92, 0, "", false},
 		{"eg6_2", "eg6_power_droid", -5295.6, 21, -2396.69, 237.183, 0, "", false},
 		{"surgical_1", "surgical_droid_21b", -23.3,  0.27, -2.7, 5.78928, 1935835, "", false},
@@ -206,7 +205,7 @@ CorelliaTyrenaScreenPlay = CityScreenPlay:new {
 		{"info_broker",300,-1.85381,0.639422,55.3013,360.011,1935687, "conversation"},
 
 		--Med Center
-		{"brawler",60,24.4668,0.26,4.56238,180.004,1935831, "angry"},
+		{"brawler",300,24.4668,0.26,4.56238,180.004,1935831, "angry"},
 		{"entertainer",60,24.4668,0.26,3.56238,0,1935831, "worried"},
 		{"trainer_doctor", 0,21,0.26,-5,0,1935831, ""},
 		{"trainer_medic", 0,13.8906,0.26,3.8275,183,1935831, ""},
@@ -232,7 +231,6 @@ CorelliaTyrenaScreenPlay = CityScreenPlay:new {
 
 		--Cantina
 		{"comm_operator",400,48.13,0.105,2.47,248.001,2625353, "npc_imperial"},
-		{"bartender",60,8.6,-0.9,0.6,90,2625355, "neutral"},
 		{"trainer_dancer", 0,16.7961,-0.894993,-10.1031,3,2625355, ""},
 		{"trainer_musician", 0,21.1399,-0.894993,8.20648,120,2625355, ""},
 
@@ -250,10 +248,8 @@ CorelliaTyrenaScreenPlay = CityScreenPlay:new {
 		--Guild Hall -5417 -2723
 		{"mercenary", 300,3.29,1.13306,-9.58,249.007,1935454, ""},
 		{"trainer_artisan", 0,0,1.13306,-14,0,1935454, ""},
-		{"coa3_information_rebel", 60,14.1936,1.13306,-8.97227,335.228,1935453, "calm"},
 
 		--Guild Hall -5463 -2722
-		{"coa3_tactical_rebel", 60,9.53575,1.13306,0.330446,310.824,1935441, "calm"},
 		{"trainer_marksman", 0,0,1.13306,-14,0,1935444, ""},
 		{"businessman", 60,3.32,1.13306,-8.49,228.007,1935444, ""},
 		{"bounty_hunter", 300,-14.01,1.13306,-8.53,120.004,1935445, ""},
@@ -336,7 +332,6 @@ CorelliaTyrenaScreenPlay = CityScreenPlay:new {
 		{"trainer_bountyhunter", 0,-5130,21,-2302,180,0, ""},
 		{"trainer_carbine", 0,-5225,21,-2488,180,0, ""},
 		{"trainer_combatmedic", 0,-4996.29,21,-2451.61,129,0, ""},
-		{"trainer_dancer", 0,34.5107,0.105,1.79681,89,3005398, ""},
 		{"trainer_doctor", 0,-5002,21,-2459,180,0, ""},
 		{"trainer_entertainer", 0,-5661,21.6,-2599.57,14,0, ""},
 		{"trainer_entertainer", 0,-5062,21,-2291,124,0, ""},
@@ -349,9 +344,16 @@ CorelliaTyrenaScreenPlay = CityScreenPlay:new {
 		{"trainer_scout", 0,-5061.86,21,-2322.52,36,0, ""},
 		{"trainer_weaponsmith", 0,-5106,21,-2324,180,0, ""},
 
-		{"larek_tatham",60,-5050.23,21,-2291.69,113.059,0, "neutral"},
+		--JTL Rebel Trainer
+		{"kreezo", 60, -4.4, 0.6, -3.6, -130, 3375654, "neutral"},
+		
+		--Space Greeters
+		{"larek_tatham", 60, -5050.23, 21, -2291.69, 113.059, 0, "neutral"},
+		{"cll_8_space", 60, -5050, 21, -2288, 145, 0, ""},
+		{"ulaire_roye", 60, -5048.68, 21, -2291.24, 113.059,0, "neutral"},
+
 		{"junk_dealer", 0, -5203.6, 21, -2285.9, -11, 0, ""},
-		{"sullustan_male",60,-5564.23,21,-2777.78,0,0, "nervous"}
+		{"sullustan_male", 60, -5564.23, 21, -2777.78, 0, 0, "nervous"}
 	}
 }
 
@@ -386,7 +388,7 @@ function CorelliaTyrenaScreenPlay:spawnMobiles()
 				CreatureObject(pMobile):setMoodString(mob[8])
 			end
 
-			AiAgent(pMobile):addCreatureFlag(AI_STATIC)
+			AiAgent(pMobile):addObjectFlag(AI_STATIC)
 
 			if CreatureObject(pMobile):getPvpStatusBitmask() == 0 then
 				CreatureObject(pMobile):clearOptionBit(AIENABLED)
@@ -396,7 +398,6 @@ function CorelliaTyrenaScreenPlay:spawnMobiles()
 
 	--{"commoner",60,-5192.9,21,-2545.55,46.5164,0, "calm", "Excited Journalist"},
 	--{"commoner",60,15.2091,0.639422,56.8933,284.328,1935687, "calm", "Amarent Loren"},
-	--{"jom_irimore",60,-5520,21.3,-2630.99,0,0, "calm", "Jom Irimore"},
 	--{"r2",60,-5295.88,21,-2528.24,196.589,0, "calm", "R2-B0"},
 	--{"r2",60,-5297.6,21,-2396.69,271.4,0, "calm", "R2-X2"},
 	--{"r2",60,-4954.63,21,-2376.82,26.4361,0, "calm", "R2-E3"},
@@ -405,7 +406,6 @@ function CorelliaTyrenaScreenPlay:spawnMobiles()
 	--{"r2",60,-13.4312,1.6,-15.4443,7.68027,1935827, "calm", "R2-P9"},
 	--{"r3",60,-16.1386,2.25,18.5614,173.343,1935472, "calm", "R3-X8"},
 	--{"r5",60,-4954.81,21,-2379.55,166.051,0, "calm", "R5-C7"},
-	--{"acun_solari",60,19.8219,-0.894996,-19.5533,0,2625356, "calm", "Acun Solari"},
 
 	local pNpc = spawnMobile(self.planet, "junk_dealer", 0, -5639.2, 21, -2799.2, -40, 0)
 	if pNpc ~= nil then

@@ -66,7 +66,7 @@ public:
 		}
 
 		// target must be attackable
-		if (!(target->getPvpStatusBitmask() & CreatureFlag::ATTACKABLE)) {
+		if (!(target->getPvpStatusBitmask() & ObjectFlag::ATTACKABLE)) {
 			droid->showFlyText("npc_reaction/flytext", "confused", 204, 0, 0);  // "?!!?!?!"
 			owner->sendSystemMessage("@pet/droid_modules:invalid_trap_target"); // "That is not a valid target."
 			return INVALIDTARGET;
@@ -157,7 +157,10 @@ public:
 			if (!CombatManager::instance()->startCombat(droid, target))
 				return GENERALERROR;
 
-			float hitChance = CombatManager::instance()->hitChanceEquation(trappingSkill, System::random(199) + 1, targetDefense, System::random(199) + 1);
+			int attackRoll = System::random(199) + 1;
+			int defendRoll = System::random(199) + 1;
+
+			float hitChance = CombatManager::instance()->hitChanceEquation(trappingSkill + attackRoll, targetDefense + defendRoll);
 
 			if (hitChance > 100)
 				hitChance = 100.0;

@@ -27,24 +27,11 @@ fbase_specialist_noncom_hard = Creature:new {
 	creatureBitmask = PACK,
 	diet = HERBIVORE,
 
-	templates = {"object/mobile/dressed_imperial_officer_f.iff",
-		"object/mobile/dressed_imperial_officer_m.iff",
-		"object/mobile/dressed_imperial_officer_m_2.iff",
-		"object/mobile/dressed_imperial_officer_m_3.iff",
-		"object/mobile/dressed_imperial_officer_m_4.iff",
-		"object/mobile/dressed_imperial_officer_m_5.iff",
-		"object/mobile/dressed_imperial_officer_m_6.iff"
-	},
+	templates = { "imperial_officer" },
 	lootGroups = {
 		{
 			groups = {
-				{group = "color_crystals", chance = 200000},
-				{group = "junk", chance = 6000000},
-				{group = "weapons_all", chance = 1250000},
-				{group = "armor_all", chance = 1250000},
-				{group = "clothing_attachments", chance = 150000},
-				{group = "armor_attachments", chance = 150000},
-				{group = "wearables_all", chance = 1000000}
+				{group = "imperial_tier_2", chance = 10000000}
 			}
 		}
 	},

@@ -17,7 +17,7 @@
 class Values : public Object {
 	VectorMap<String, float> values;
 	String name;
-	float minValue, maxValue;
+	float minValue, maxValue, capValue;
 	short precision;
 	short combineType;
 	bool locked;
@@ -26,11 +26,13 @@ class Values : public Object {
 public:
 	Values() = delete;
 
-	Values(const String& n, const float& tempmin, const float& tempmax, const int& prec, const bool& filler, const int& combine) {
+	Values(const String& n, const float& tempmin, const float& tempmax, const float& tempcap, const int& prec, const bool& filler, const int& combine) {
 		name = n;
 
 		minValue = tempmin;
 		maxValue = tempmax;
+		capValue = tempcap;
+
 		precision = prec;
 
 		locked = false;
@@ -48,17 +50,15 @@ public:
 		name = val.name;
 		minValue = val.minValue;
 		maxValue = val.maxValue;
+		capValue = val.capValue;
 		precision = val.precision;
 		locked = val.locked;
 		experimentalProperties = val.experimentalProperties;
 		combineType = val.combineType;
 	}
 
-	Values(Values&& val) : Object(), values(std::move(val.values)),
-					  name(std::move(val.name)), minValue(val.minValue),
-					  maxValue(val.maxValue), precision(val.precision),
-	      				  combineType(val.combineType), locked(val.locked),
-					  experimentalProperties(val.experimentalProperties) {
+	Values(Values&& val) : Object(), values(std::move(val.values)), name(std::move(val.name)), minValue(val.minValue), maxValue(val.maxValue), precision(val.precision),
+		combineType(val.combineType), locked(val.locked), experimentalProperties(val.experimentalProperties) {
 	}
 
 	~Values(){
@@ -82,6 +82,10 @@ public:
 
 	inline float getMaxValue() const {
 		return maxValue;
+	}
+
+	inline float getCapValue() const {
+		return capValue;
 	}
 
 	inline int getPrecision() const {
@@ -165,6 +169,13 @@ public:
 		maxValue = value;
 	}
 
+	inline void setCapValue(const float& value) {
+		if (locked)
+			return;
+
+		capValue = value;
+	}
+
 	inline void setPrecision(const int& value) {
 		if (locked)
 			return;
@@ -209,6 +220,14 @@ public:
 
 		values.put("currentPercentage", value);
 	}
+
+	inline void setCombineType(short combine) {
+		if (locked)
+			return;
+
+		combineType = combine;
+	}
+
 	inline void resetValue() {
 		float reset = (getMaxPercentage() * 10.0f) * (0.000015f * (getMaxPercentage() * 10.0f) + 0.015f);
 		setPercentage(reset);
@@ -222,7 +241,7 @@ public:
 	}
 
 };
-
+/*
 class Subclasses : public Object {
 	VectorMap<String, Reference<Values*> > valueList;
 	float avePercentage;
@@ -233,9 +252,7 @@ class Subclasses : public Object {
 public:
 	Subclasses() = delete;
 
-	Subclasses(const String& title, const String& subtitle, const float
-			min, const float max, const int precision, const bool filler, const int combine) {
-
+	Subclasses(const String& title, const String& subtitle, const float min, const float max, const int precision, const bool filler, const int combine) {
 		classTitle = title;
 
 		name = subtitle;
@@ -270,14 +287,11 @@ public:
 		}
 	}
 
-	Subclasses(Subclasses&& sub) : Object(), valueList(std::move(sub.valueList)),
-					avePercentage(sub.avePercentage), name(std::move(sub.name)),
-					classTitle(std::move(sub.classTitle)), hidden(sub.hidden) {
+	Subclasses(Subclasses&& sub) : Object(), valueList(std::move(sub.valueList)), avePercentage(sub.avePercentage), name(std::move(sub.name)), classTitle(std::move(sub.classTitle)), hidden(sub.hidden) {
 	}
 
 	~Subclasses(){
 	}
-
 	void addSubtitle(const String& s, const float min, const float max, const int precision, const bool filler, const int combine) {
 
 		if (valueList.contains(s)) {
@@ -387,5 +401,5 @@ public:
 		return str.toString();
 	}
 };
-
+*/
 #endif /*VALUESCLASSES_H_*/

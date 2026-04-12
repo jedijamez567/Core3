@@ -26,7 +26,29 @@ dnaStrandLength = 23
 destructionTimer = 600
 
 -- maximum bases per planet
-maxBases = 25
+maxBasesPerPlanet = 25
+
+-- Maximum bases placeable per player. Reducing this number will automatically remove extra bases from players upon login
+maxBasesPerPlayer = 3
+
+-- The construction delay when placing a GCW base in seconds
+basePlacementDelay = 10
+
+-- Allow placement of GCW bases while player is in comabt
+placeInCombat = true
+
+-- allow the placement of PvE Faction bases. Setting this false will begin the destruction task for PvE bases when the GCW runs its sanity checks after server loading
+allowPveBases = true
+
+-- Allow bases to be placed together
+allowBaseComplex = true
+baseComplexSize = 3
+
+-- Range at which bases can be placed near one another. If base complexes are enabled they will adhere to this distance
+nearbyBaseDistance = 600
+
+-- Cooldown on dotations to GCW bases in seconds
+donationCooldown = 1
 
 -- time in seconds that a player must be overt before aborting a facility shutdown
 overtCooldown = 300
@@ -41,8 +63,6 @@ reactivationTimer = 300
 -- X seconds after the last manual activity the turret will be able to auto fire
 turretAutoFireTimeout = 20
 
-maxBasesPerPlayer = 3
-
 -- Enable Alarms on player GCW bases
 spawnBaseAlarms = false
 
@@ -55,23 +75,14 @@ crackdownScansEnabled = true
 -- thresholds for scaling crackdown npc's difficulty, first threshold should always be 0.
 difficutlyScalingThresholds = {0, 64}
 
---[[
--- TESTING VALUES
-crackdownScanPrivilegedPlayers = true
-wildScanInterval = 2 * 60 -- In seconds
-wildScanChance = 75 -- % chance for a valid scan target to be scanned
-crackdownPlayerScanCooldown = 15 * 60  -- In seconds
-crackdownContrabandFineCredits = 10000
-crackdownContrabandFineFactionPoints = 100
-crackdownPlanetsWithWildScans = { "corellia", "dantooine", "dathomir", "endor", "lok", "naboo", "rori", "talus", "tatooine", "yavin4"}
-]]
-
 -- PRODUCTION SERVER VALUES
 crackdownScanPrivilegedPlayers = false
-wildScanInterval = 10 * 60 -- In seconds
-wildScanChance = 15 -- % chance for a valid scan target to be scanned
-crackdownPlayerScanCooldown = 2 * 24 * 60 * 60  -- In seconds, 48 hour cooldown
-crackdownContrabandFineCredits = 10000
+wildScanInterval = 15 * 60 -- In seconds, 15 minutes + System::random(600000) 10 minuutes
+wildScanLoginDelay = 4 * 60 -- In Seconds, 4 minutes
+wildScanChance = 5 -- % chance for a valid scan target to be scanned
+crackdownPlayerScanCooldown = 48 * 60 * 60  -- In seconds, 48 hour cooldown
+crackdownScannerCooldown = 3 * 60 * 60 -- In seconds, 3 hour cooldown
+crackdownContrabandFineCredits = 2000
 crackdownContrabandFineFactionPoints = 100
 crackdownPlanetsWithWildScans = { "corellia", "dantooine", "dathomir", "endor", "lok", "naboo", "rori", "talus", "tatooine", "yavin4"}
 
@@ -119,7 +130,7 @@ HQValues = {
 
 -- race (raceid, penalty_multiplier)
 -- raceid found in creatureobject
---HUMAN = 0; RODIAN = 1; TRANDOSHAN = 2; MONCAL = 3; WOOKIE = 4; BOTHAN = 5; TWILEK = 6; ZABRAK = 7; ITHORIAN = 0x21; SULLUSTAN = 0x31;
+--HUMAN = 0; RODIAN = 1; TRANDOSHAN = 2; MONCAL = 3; WOOKIEE = 4; BOTHAN = 5; TWILEK = 6; ZABRAK = 7; ITHORIAN = 0x21; SULLUSTAN = 0x31;
 imperial_racial_penalty = {
 	{0, 1},
 	{1, 3}, --rodian
@@ -194,9 +205,9 @@ terminalSpawns = {
 		{
 			{ -5.15, 0.3, 3.25, 0, 0.707, 0, 0.707, 2 },
 			{ -2.79, -6.8, -10.35, 0, 0, 0, 1, 5 },
-			{ -9.29, -6.8, -4.9, 0, 0, 0, 1, 5 },
-			{ -6.71, -6.8, -12, 0, 0, 0, 1, 6 },
-			{ 7.4, -6.8, -12, 0, 0, 0, 1, 6 },
+			{ -9.29, -6.8, -4.9, 0, 0.707, 0, 0.707, 5 },
+			{ -6.71, -6.8, -12, 0, 1, 0, 0, 6 },
+			{ 7.4, -6.8, -12, 0, 1, 0, 0, 6 },
 			{ 1.67, -6.8, -8.98, 0, 0.707, 0, 0.707, 7 },
 			{ 5.16, -13.8, -13.13, 0, -0.707, 0, 0.707, 9 },
 			{ -10.16, -13.8, -13.13, 0, 0.707, 0, 0.707, 9 },
@@ -316,8 +327,14 @@ squadFormations = {
 	{"stormtrooper_easy",
 		{"stormtrooper_squad_leader", "stormtrooper", "stormtrooper", "stormtrooper", "stormtrooper", "stormtrooper", "stormtrooper", "stormtrooper", "stormtrooper", "stormtrooper", "stormtrooper", "stormtrooper", "stormtrooper"},
 	},
+	{"stormtrooper_easy_atst",
+		{"stormtrooper_squad_leader", "stormtrooper", "stormtrooper", "stormtrooper", "stormtrooper", "stormtrooper", "stormtrooper", "stormtrooper", "stormtrooper", "stormtrooper", "stormtrooper", "stormtrooper", "stormtrooper", "at_st"},
+	},
 	{"stormtrooper_extreme",
 		{"fbase_stormtrooper_squad_leader_extreme", "fbase_stormtrooper_extreme", "fbase_stormtrooper_extreme", "fbase_stormtrooper_extreme", "fbase_stormtrooper_extreme", "fbase_stormtrooper_extreme", "fbase_stormtrooper_extreme", "fbase_stormtrooper_extreme", "fbase_stormtrooper_extreme", "fbase_stormtrooper_extreme", "fbase_stormtrooper_extreme", "fbase_stormtrooper_extreme", "fbase_stormtrooper_extreme"},
+	},
+	{"stormtrooper_extreme_atst",
+		{"fbase_stormtrooper_squad_leader_extreme", "fbase_stormtrooper_extreme", "fbase_stormtrooper_extreme", "fbase_stormtrooper_extreme", "fbase_stormtrooper_extreme", "fbase_stormtrooper_extreme", "fbase_stormtrooper_extreme", "fbase_stormtrooper_extreme", "fbase_stormtrooper_extreme", "fbase_stormtrooper_extreme", "fbase_stormtrooper_extreme", "fbase_stormtrooper_extreme", "fbase_stormtrooper_extreme", "at_st"},
 	},
 	{"novatrooper",
 		{"novatrooper_squad_leader", "elite_novatrooper", "elite_novatrooper", "elite_novatrooper", "elite_novatrooper", "elite_novatrooper", "elite_novatrooper", "elite_novatrooper", "elite_novatrooper", "dark_trooper_novatrooper", "dark_trooper_novatrooper", "novatrooper_medic", "novatrooper_ensign"},

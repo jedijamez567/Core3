@@ -77,7 +77,7 @@ int CreatureImplementation::handleObjectMenuSelect(CreatureObject* player, byte 
 void CreatureImplementation::fillAttributeList(AttributeListMessage* alm, CreatureObject* player) {
 	AiAgentImplementation::fillAttributeList(alm, player);
 
-	int creaKnowledge = player->getSkillMod("creature_knowledge");
+	int creaKnowledge = player != nullptr ?  player->getSkillMod("creature_knowledge") : 100;
 
 	if (getHideType().isEmpty() && getBoneType().isEmpty() && getMeatType().isEmpty()) {
 		if(!isPet()) // we do want to show this for pets
@@ -85,7 +85,7 @@ void CreatureImplementation::fillAttributeList(AttributeListMessage* alm, Creatu
 	}
 
 	if (creaKnowledge >= 5) {
-		if (isAggressiveTo(player))
+		if (player != nullptr && isAggressiveTo(player))
 			alm->insertAttribute("aggro", "yes");
 		else
 			alm->insertAttribute("aggro", "no");
@@ -184,16 +184,6 @@ void CreatureImplementation::fillAttributeList(AttributeListMessage* alm, Creatu
 	}
 }
 
-void CreatureImplementation::scheduleDespawn() {
-	if (getPendingTask("despawn") != nullptr)
-		return;
-
-	Reference<DespawnCreatureTask*> despawn = new DespawnCreatureTask(_this.getReferenceUnsafeStaticCast());
-	//despawn->schedule(300000); /// 5 minutes
-	//addPendingTask("despawn", despawn, 45000); /// 45 second
-	addPendingTask("despawn", despawn, 300000);
-}
-
 bool CreatureImplementation::hasOrganics() {
 	return ((getHideMax() + getBoneMax() + getMeatMax()) > 0);
 }
@@ -206,7 +196,7 @@ bool CreatureImplementation::hasDNA() {
 		return false;
 	}
 	// skip droids and anything that doesnt have organic bits or it doesnt eat
-	if (isDroidObject() || !hasOrganics() || getDiet() == CreatureFlag::NONE) {
+	if (isDroidObject() || !hasOrganics() || getDiet() == ObjectFlag::NONE) {
 		return false;
 	}
 	return (dnaState == CreatureManager::HASDNA);
@@ -347,18 +337,24 @@ float CreatureImplementation::getChanceToTame(CreatureObject* player) {
 bool CreatureImplementation::isVicious() {
 	CreatureTemplate* creatureTemplate = npcTemplate.get();
 
-	return creatureTemplate->getPvpBitmask() & CreatureFlag::AGGRESSIVE;
+	return creatureTemplate->getPvpBitmask() & ObjectFlag::AGGRESSIVE;
 }
 
 bool CreatureImplementation::canMilkMe(CreatureObject* player) {
+	if (player == nullptr)
+		return false;
 
 	if (!hasMilk() || milkState != CreatureManager::NOTMILKED  || _this.getReferenceUnsafeStaticCast()->isInCombat() || _this.getReferenceUnsafeStaticCast()->isDead() || isPet())
 		return false;
 
-	if(!player->isInRange(_this.getReferenceUnsafeStaticCast(), 5.0f) || player->isInCombat() || player->isDead() || player->isIncapacitated() || !(player->hasState(CreatureState::MASKSCENT)))
+	if(!player->isInRange(_this.getReferenceUnsafeStaticCast(), 7.0f) || player->isInCombat() || player->isDead() || player->isIncapacitated() || !(player->hasState(CreatureState::MASKSCENT)))
 		return false;
 
 	return true;
+}
+
+bool CreatureImplementation::hasBeenMilked() const {
+	return milkState == CreatureManager::ALREADYMILKED;
 }
 
 bool CreatureImplementation::hasSkillToSampleMe(CreatureObject* player) {
@@ -413,9 +409,35 @@ void CreatureImplementation::loadTemplateDataForBaby(CreatureTemplate* templateD
 
 	setBaby(true);
 
-	clearPvpStatusBit(CreatureFlag::AGGRESSIVE, false);
-	clearPvpStatusBit(CreatureFlag::ENEMY, false);
-	setCreatureBitmask(getCreatureBitmask() + CreatureFlag::BABY);
+	clearPvpStatusBit(ObjectFlag::AGGRESSIVE, false);
+	clearPvpStatusBit(ObjectFlag::ENEMY, false);
+
+	// Clear potential parent bits
+	removeObjectFlag(ObjectFlag::STALKER);
+	removeObjectFlag(ObjectFlag::KILLER);
+	removeObjectFlag(ObjectFlag::HEALER);
+
+	// Add baby bit
+	addObjectFlag(ObjectFlag::BABY);
+
+	/*
+	auto inventory = getInventory();
+	int invSize  = inventory->getContainerObjectsSize();
+
+	if (invSize > 1) {
+		StringBuffer msg;
+		msg << "\033[32m" << getDisplayedName() << " ID: " << getObjectID() << " Inventory size: " << inventory->getContainerObjectsSize() << endl;
+
+
+		for (int i = 0; i < inventory->getContainerObjectsSize(); ++i) {
+			auto object = inventory->getContainerObject(i);
+
+			msg << getDisplayedName() << " ID: " << getObjectID() << "Inventory - #" << i << " Item: " << object->getObjectNameStringIdName() << " -- " << object->getObjectTemplate()->getTemplateFileName() << " ID: " << object->getObjectID() << endl;
+		}
+
+		info(true) << msg.toString() << "\033[0m";
+	}
+	*/
 }
 
 void CreatureImplementation::setPetLevel(int newLevel) {
@@ -430,6 +452,8 @@ void CreatureImplementation::setPetLevel(int newLevel) {
 		return;
 	}
 
+	Creature* thisCreature = _this.getReferenceUnsafeStaticCast();
+
 	clearBuffs(false, false);
 
 	int baseLevel = getTemplateLevel();
@@ -437,22 +461,27 @@ void CreatureImplementation::setPetLevel(int newLevel) {
 	float minDmg = calculateAttackMinDamage(baseLevel);
 	float maxDmg = calculateAttackMaxDamage(baseLevel);
 
-	Reference<WeaponObject*> defaultWeapon = asAiAgent()->getDefaultWeapon();
-
 	float ratio = ((float)newLevel) / (float)baseLevel;
 	minDmg *= ratio;
 	maxDmg *= ratio;
 
-	if (primaryWeapon != nullptr && primaryWeapon != defaultWeapon) {
-		float mod = 1.f - 0.1f*float(primaryWeapon->getArmorPiercing());
+	ManagedReference<WeaponObject*> defaultWeap = getDefaultWeapon();
+	ManagedReference<WeaponObject*> primaryWeap = getPrimaryWeapon();
 
-		primaryWeapon->setMinDamage(minDmg * mod);
-		primaryWeapon->setMaxDamage(maxDmg * mod);
+	if (primaryWeap != nullptr && primaryWeap != defaultWeap) {
+		Locker primLock(primaryWeap, thisCreature);
+
+		float mod = 1.f - 0.1f*float(primaryWeap->getArmorPiercing());
+
+		primaryWeap->setMinDamage(minDmg * mod);
+		primaryWeap->setMaxDamage(maxDmg * mod);
 	}
 
-	if (defaultWeapon != nullptr) {
-		defaultWeapon->setMinDamage(minDmg);
-		defaultWeapon->setMaxDamage(maxDmg);
+	if (defaultWeap != nullptr) {
+		Locker defLock(defaultWeap, thisCreature);
+
+		defaultWeap->setMinDamage(minDmg);
+		defaultWeap->setMaxDamage(maxDmg);
 	}
 
 	int ham = 0;
@@ -472,6 +501,22 @@ void CreatureImplementation::setPetLevel(int newLevel) {
 	for (int i = 0; i < 9; ++i) {
 		setMaxHAM(i, baseHAM.get(i));
 	}
+}
+
+int CreatureImplementation::getAdultLevel() {
+	auto creatureDeed = getPetDeed();
+
+	// Pet Deed is not null, use the level from that
+	if (creatureDeed != nullptr) {
+		return creatureDeed->getLevel();
+	}
+
+	if (npcTemplate != nullptr) {
+		return npcTemplate->getLevel();
+	}
+
+	// Just use the creatures level
+	return getLevel();
 }
 
 bool CreatureImplementation::isMount() {

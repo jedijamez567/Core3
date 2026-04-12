@@ -33,9 +33,11 @@
 #include "server/zone/packets/chat/ChatOnChangeFriendStatus.h"
 #include "server/zone/packets/chat/ChatOnChangeIgnoreStatus.h"
 #include "server/zone/packets/chat/ChatFriendsListUpdate.h"
+#include "server/zone/packets/scene/ServerTimeMessage.h"
 #include "server/zone/packets/zone/CmdSceneReady.h"
 #include "server/zone/objects/waypoint/WaypointObject.h"
 #include "server/zone/objects/creature/CreatureObject.h"
+#include "server/zone/objects/transaction/TransactionLog.h"
 #include "server/chat/StringIdChatParameter.h"
 #include "server/zone/objects/area/ActiveArea.h"
 #include "server/zone/objects/player/events/PlayerDisconnectEvent.h"
@@ -47,6 +49,7 @@
 #include "server/zone/objects/group/GroupObject.h"
 #include "server/zone/objects/guild/GuildObject.h"
 #include "server/zone/objects/intangible/ControlDevice.h"
+#include "server/zone/objects/intangible/ShipControlDevice.h"
 #include "server/zone/objects/structure/events/StructureSetOwnerTask.h"
 #include "server/zone/packets/player/BadgesResponseMessage.h"
 #include "server/zone/managers/weather/WeatherManager.h"
@@ -60,6 +63,7 @@
 #include "server/zone/objects/player/events/StoreSpawnedChildrenTask.h"
 #include "server/zone/objects/player/events/RemoveSpouseTask.h"
 #include "server/zone/objects/player/events/PvpTefRemovalTask.h"
+#include "server/zone/objects/player/events/SpawnHelperDroidTask.h"
 #include "server/zone/managers/visibility/VisibilityManager.h"
 #include "server/zone/managers/jedi/JediManager.h"
 #include "server/zone/objects/player/events/ForceRegenerationEvent.h"
@@ -77,9 +81,12 @@
 #include "server/zone/managers/director/DirectorManager.h"
 #include "server/db/ServerDatabase.h"
 #include "server/ServerCore.h"
-#ifdef WITH_SESSION_API
-#include "server/login/SessionAPIClient.h"
-#endif // WITH_SESSION_API
+#include "server/zone/managers/gcw/GCWManager.h"
+#include "server/zone/objects/ship/ShipObject.h"
+
+#ifdef WITH_SWGREALMS_API
+#include "server/login/SWGRealmsAPI.h"
+#endif // WITH_SWGREALMS_API
 
 void PlayerObjectImplementation::initializeTransientMembers() {
 	playerLogLevel = ConfigManager::instance()->getPlayerLogLevel();
@@ -106,6 +113,11 @@ void PlayerObjectImplementation::initializeTransientMembers() {
 	sessionStatsTotalCredits = 0;
 	sessionStatsIPAddress = "";
 	miliSecsSession = 0;
+
+	// Build the transient ability list
+	for (int i = 0; i < abilityList.size(); i++) {
+		activeAbilities.add(abilityList.get(i));
+	}
 }
 
 PlayerObject* PlayerObjectImplementation::asPlayerObject() {
@@ -174,8 +186,6 @@ void PlayerObjectImplementation::loadTemplateData(SharedObjectTemplate* template
 
 	SharedPlayerObjectTemplate* sply = dynamic_cast<SharedPlayerObjectTemplate*>(templateData);
 
-	characterBitmask = 0;
-
 	adminLevel = 0;
 
 	forcePower = getForcePower();
@@ -242,33 +252,72 @@ void PlayerObjectImplementation::notifyLoadFromDatabase() {
 	clientLastMovementStamp = 0;
 }
 
-void PlayerObjectImplementation::unloadSpawnedChildren() {
-	ManagedReference<SceneObject*> datapad = getParent().get()->getSlottedObject("datapad");
-	ManagedReference<CreatureObject*> creo = dynamic_cast<CreatureObject*>(parent.get().get());
+void PlayerObjectImplementation::unloadSpawnedChildren(bool skipShips) {
+	ManagedReference<CreatureObject*> player = dynamic_cast<CreatureObject*>(parent.get().get());
 
-	if (datapad == nullptr)
+	if (player == nullptr) {
 		return;
+	}
 
-	Vector<ManagedReference<CreatureObject*> > childrenToStore;
+	ManagedReference<SceneObject*> datapad = player->getSlottedObject("datapad");
+
+	if (datapad == nullptr) {
+		return;
+	}
+
+	// info(true) << player->getDisplayedName() << " calling -- PlayerObjectImplementation::unloadSpawnedChildren() -- Contained Objects Size: " << datapad->getContainerObjectsSize();
+
+	Vector<ManagedReference<ControlDevice*> > devicesToStore;
 
 	for (int i = 0; i < datapad->getContainerObjectsSize(); ++i) {
 		ManagedReference<SceneObject*> object = datapad->getContainerObject(i);
 
-		if (object->isControlDevice()) {
-			ControlDevice* device = cast<ControlDevice*>( object.get());
-
-			ManagedReference<CreatureObject*> child = cast<CreatureObject*>(device->getControlledObject());
-			if (child != nullptr)
-				childrenToStore.add(child);
+		if (object == nullptr || !object->isControlDevice()) {
+			continue;
 		}
+
+		ControlDevice* device = cast<ControlDevice*>(object.get());
+
+		if (device == nullptr) {
+			continue;
+		}
+
+		bool isShipDevice = device->isShipControlDevice();
+
+		// Check for storing only pets
+		if (skipShips && isShipDevice) {
+			continue;
+		}
+
+		// Do not force store ships when it is not in the space zone
+		if (isShipDevice) {
+			auto ship = device->getControlledObject();
+
+			// Ship has already been removed from the space zone
+			if (ship == nullptr || ship->getLocalZone() == nullptr) {
+				continue;
+			}
+		}
+
+		// info(true) << player->getDisplayedName() << " -- PlayerObjectImplementation::unloadSpawnedChildren() -- adding device to store: " << device->getDisplayedName();
+
+		devicesToStore.add(device);
 	}
 
-	StoreSpawnedChildrenTask* task = new StoreSpawnedChildrenTask(creo, std::move(childrenToStore));
-	task->execute();
+	StoreSpawnedChildrenTask* task = new StoreSpawnedChildrenTask(player, std::move(devicesToStore));
+
+	if (task != nullptr) {
+		task->execute();
+	}
 }
 
-void PlayerObjectImplementation::setLastLogoutWorldPosition(const Vector3& position) {
-	lastLogoutWorldPosition = position;
+void PlayerObjectImplementation::setLastLogoutWorldPosition() {
+	auto player = dynamic_cast<CreatureObject*>(parent.get().get());
+
+	if (player == nullptr)
+		return;
+
+	lastLogoutWorldPosition = player->getWorldPosition();
 }
 
 Vector3 PlayerObjectImplementation::getLastLogoutWorldPosition() const {
@@ -276,56 +325,126 @@ Vector3 PlayerObjectImplementation::getLastLogoutWorldPosition() const {
 }
 
 void PlayerObjectImplementation::unload() {
-	debug("unloading player");
-
 	ManagedReference<CreatureObject*> creature = dynamic_cast<CreatureObject*>(parent.get().get());
 
-	MissionManager* missionManager = creature->getZoneServer()->getMissionManager();
-	missionManager->deactivateMissions(creature);
+	if (creature == nullptr) {
+		error() << "PlayerCreature parent was null during PlayerObjectImplementation::unload. -- PlayerObjectID: " << getObjectID();
+		return;
+	}
 
+	auto zoneServer = creature->getZoneServer();
+
+	if (zoneServer == nullptr) {
+		return;
+	}
+
+	debug() << creature->getDisplayedName() << " calling -- PlayerObjectImplementation::unload()";
+	// info(true) << creature->getDisplayedName() << " calling -- PlayerObjectImplementation::unload()";
+
+	// Deactivate the players mission
+	auto missionManager = zoneServer->getMissionManager();
+
+	if (missionManager != nullptr) {
+		missionManager->deactivateMissions(creature);
+	}
+
+	// Check to see if creature is riding a mount, though they should no longer be due to unloadSpawnedChildren, this should only appy now to players in multipassenger vehicles
 	if (creature->isRidingMount()) {
 		creature->executeObjectControllerAction(STRING_HASHCODE("dismount"));
 	}
 
+	// Try to store any spawned pets, ships or vehicles
 	unloadSpawnedChildren();
 
-	PlayerManager* playerManager = creature->getZoneServer()->getPlayerManager();
-	playerManager->ejectPlayerFromBuilding(creature);
+	// Remove player from active areas
+	SortedVector<ManagedReference<ActiveArea*>>* activeAreas = creature->getActiveAreas();
 
-	ManagedReference<SceneObject*> creoParent = creature->getParent().get();
+	if (activeAreas != nullptr) {
+		for (int i = 1; i < activeAreas->size(); i++) {
+			ActiveArea* area = activeAreas->get(i);
 
-	if (creature->getZone() != nullptr) {
-		savedTerrainName = creature->getZone()->getZoneName();
+			if (area == nullptr)
+				continue;
 
-		if (creoParent != nullptr) {
-			savedParentID = creoParent->getObjectID();
-		} else {
-			savedParentID = 0;
+			creature->dropActiveArea(area);
 		}
 
+		if (creature->isInNoCombatArea()) {
+			creature->setInNoCombatArea(false);
+		}
+	}
+
+	if (!creature->isOnboardPobShip()) {
+		PlayerManager* playerManager = creature->getZoneServer()->getPlayerManager();
+		playerManager->ejectPlayerFromBuilding(creature);
+	}
+
+	ManagedReference<SceneObject*> creoParent = creature->getParent().get();
+	auto zone = creature->getZone();
+
+	// Store players saved parent and location
+	if (zone != nullptr) {
+		String zoneName = zone->getZoneName();
+
+		// Player is in a ship in space, send them back to their launch location
+		if (zone->isSpaceZone()) {
+			zoneName = launchPoint.getGoundZoneName();
+			Vector3 launchLoc = launchPoint.getLocation();
+
+			if (zoneName.isEmpty()) {
+				zoneName = "corellia";
+				launchLoc.set(-66, 28, -4711);
+			}
+
+			creature->setPosition(launchLoc.getX(), launchLoc.getZ(), launchLoc.getY());
+			creature->incrementMovementCounter();
+
+			updateLastValidatedPosition();
+
+			savedParentID = 0;
+		} else {
+			if (creoParent != nullptr) {
+				savedParentID = creoParent->getObjectID();
+			} else {
+				savedParentID = 0;
+			}
+		}
+
+		// Set the saved zone
+		setSavedTerrainName(zoneName);
+
+		// Remove player from world
 		creature->destroyObjectFromWorld(true);
 	}
 
+	// Clear combat
 	creature->clearCombatState(true);
 
+	// Clear Special Appearance
 	creature->setAlternateAppearance("", false);
 
+	// Stop dancing or playing music
 	creature->stopEntertaining();
 
+	// Cancel active trade session
 	ManagedReference<TradeSession*> tradeContainer = creature->getActiveSession(SessionFacadeType::TRADE).castTo<TradeSession*>();
 
-	if (tradeContainer != nullptr)
+	if (tradeContainer != nullptr) {
 		creature->dropActiveSession(SessionFacadeType::TRADE);
+	}
 
 	//Remove player from Chat Manager and all rooms.
 	ManagedReference<ChatManager*> chatManager = getZoneServer()->getChatManager();
+
 	if (chatManager != nullptr) {
 		chatManager->removePlayer(creature->getFirstName().toLowerCase());
 
 		for (int i = 0; i < chatRooms.size(); i++) {
 			ManagedReference<ChatRoom*> room = chatManager->getChatRoom(chatRooms.get(i));
+
 			if (room != nullptr) {
 				Locker clocker(room, creature);
+
 				room->removePlayer(creature, true);
 			}
 		}
@@ -335,16 +454,14 @@ void PlayerObjectImplementation::unload() {
 
 	GroupObject* group = creature->getGroup();
 
-	if (group != nullptr)
+	if (group != nullptr) {
 		GroupManager::instance()->leaveGroup(group, creature);
+	}
 
 	/*StringBuffer msg;
 	msg << "remaining play ref count: " << asPlayerObject()->getReferenceCount();
 	msg << " - remaining creo ref count: " << creature->getReferenceCount();
-	info(msg.toString(), true);
-
-	asPlayerObject()->printReferenceHolders();
-	creature->printReferenceHolders();*/
+	info(msg.toString(), true);*/
 }
 
 int PlayerObjectImplementation::calculateBhReward() {
@@ -386,6 +503,8 @@ void PlayerObjectImplementation::sendBaselinesTo(SceneObject* player) {
 }
 
 void PlayerObjectImplementation::notifySceneReady() {
+	// info(true) << cast<CreatureObject*>(parent.get().get())->getDisplayedName() << " --- notifySceneReady called";
+
 	teleporting = false;
 	onLoadScreen = false;
 	forcedTransform = false;
@@ -395,8 +514,9 @@ void PlayerObjectImplementation::notifySceneReady() {
 
 	ManagedReference<CreatureObject*> creature = cast<CreatureObject*>(parent.get().get());
 
-	if (creature == nullptr)
+	if (creature == nullptr) {
 		return;
+	}
 
 	creature->broadcastPvpStatusBitmask();
 
@@ -419,8 +539,9 @@ void PlayerObjectImplementation::notifySceneReady() {
 
 	ZoneServer* zoneServer = getZoneServer();
 
-	if (zoneServer == nullptr || zoneServer->isServerLoading())
+	if (zoneServer == nullptr || zoneServer->isServerLoading()) {
 		return;
+	}
 
 	//Join GuildChat
 	ManagedReference<ChatManager*> chatManager = zoneServer->getChatManager();
@@ -428,33 +549,38 @@ void PlayerObjectImplementation::notifySceneReady() {
 
 	if (guild != nullptr) {
 		ManagedReference<ChatRoom*> guildChat = guild->getChatRoom();
+
 		if (guildChat != nullptr) {
 			guildChat->sendTo(creature);
 			chatManager->handleChatEnterRoomById(creature, guildChat->getRoomID(), -1, true);
 		}
 	}
 
-	//Leave all planet chat rooms
+	//Leave all planet chat rooms (need evidence of planet rooms for space)
 	for (int i = 0; i < zoneServer->getZoneCount(); ++i) {
 		ManagedReference<Zone*> zone = zoneServer->getZone(i);
 
-		if (zone == nullptr)
+		if (zone == nullptr) {
 			continue;
+		}
 
 		ManagedReference<ChatRoom*> planetRoom = zone->getPlanetChatRoom();
-		if (planetRoom == nullptr)
+
+		if (planetRoom == nullptr) {
 			continue;
+		}
 
 		Locker clocker(planetRoom, creature);
 		planetRoom->removePlayer(creature);
 		planetRoom->sendDestroyTo(creature);
-
 	}
 
 	//Join current zone's Planet chat room
 	ManagedReference<Zone*> zone = creature->getZone();
+
 	if (zone != nullptr) {
 		ManagedReference<ChatRoom*> planetChat = zone->getPlanetChatRoom();
+
 		if (planetChat != nullptr) {
 			planetChat->sendTo(creature);
 			chatManager->handleChatEnterRoomById(creature, planetChat->getRoomID(), -1, true);
@@ -472,21 +598,32 @@ void PlayerObjectImplementation::notifySceneReady() {
 			room->sendTo(creature);
 			chatManager->handleChatEnterRoomById(creature, room->getRoomID(), -1);
 
-		} else
+		} else {
 			chatRooms.remove(i);
-	}
-
-	if(creature->getZone() != nullptr && creature->getZone()->getPlanetManager() != nullptr) {
-		ManagedReference<WeatherManager*> weatherManager = creature->getZone()->getPlanetManager()->getWeatherManager();
-		if(weatherManager != nullptr) {
-			creature->setCurrentWind((byte)System::random(200));
-			creature->setCurrentWeather(0xFF);
-			weatherManager->sendWeatherTo(creature);
 		}
 	}
 
+	// Show Terms of Service window
 	checkAndShowTOS();
 
+	if (zone != nullptr && !zone->isSpaceZone()) {
+		auto planetManager = zone->getPlanetManager();
+
+		if (planetManager != nullptr) {
+			ManagedReference<WeatherManager*> weatherManager = zone->getPlanetManager()->getWeatherManager();
+
+			if (weatherManager != nullptr) {
+				creature->setCurrentWind((byte)System::random(200));
+				creature->setCurrentWeather(0xFF);
+				weatherManager->sendWeatherTo(creature);
+			}
+		}
+
+		// Create or spawn the helper droid
+		createHelperDroid();
+	}
+
+	// info(true) << creature->getDisplayedName() << " --- notifySceneReady COMPLETE with Zone Name: " << zone->getZoneName() << " World Pos: " << creature->getWorldPosition().toString();
 }
 
 void PlayerObjectImplementation::sendFriendLists() {
@@ -525,57 +662,56 @@ void PlayerObjectImplementation::sendMessage(BasePacket* msg) {
 	}
 }
 
-bool PlayerObjectImplementation::setCharacterBit(uint32 bit, bool notifyClient) {
-	if (!(characterBitmask & bit)) {
-		characterBitmask |= bit;
+bool PlayerObjectImplementation::setPlayerBit(uint32 bit, bool notifyClient) {
+	if (!playerBitmask.hasPlayerBit(bit)) {
+		playerBitmask.setOneBit(bit);
 
 		if (notifyClient) {
 			PlayerObjectDeltaMessage3* delta = new PlayerObjectDeltaMessage3(asPlayerObject());
-			delta->updateCharacterBitmask(characterBitmask);
+			delta->updatePlayerBitmasks();
 			delta->close();
 
 			broadcastMessage(delta, true);
 		}
 		return true;
-	} else
-		return false;
+	}
+	return false;
+}
+
+bool PlayerObjectImplementation::clearPlayerBit(uint32 bit, bool notifyClient) {
+	if (playerBitmask.hasPlayerBit(bit)) {
+		playerBitmask.clearOneBit(bit);
+
+		if (notifyClient) {
+			PlayerObjectDeltaMessage3* delta = new PlayerObjectDeltaMessage3(asPlayerObject());
+			delta->updatePlayerBitmasks();
+			delta->close();
+
+			broadcastMessage(delta, true);
+		}
+		return true;
+	}
+	return false;
 }
 
 bool PlayerObjectImplementation::isAnonymous() const {
-	return (characterBitmask & ((uint32)ANONYMOUS)) != 0;
+	return playerBitmask.hasPlayerBit(PlayerBitmasks::ANONYMOUS);
 }
 
 bool PlayerObjectImplementation::isAFK() const {
-	return (characterBitmask & ((uint32)AFK)) != 0;
+	return playerBitmask.hasPlayerBit(PlayerBitmasks::AFK);
 }
 
 bool PlayerObjectImplementation::isRoleplayer() const {
-	return (characterBitmask & ((uint32)ROLEPLAYER)) != 0;
+	return playerBitmask.hasPlayerBit(PlayerBitmasks::ROLEPLAYER);
 }
 
 bool PlayerObjectImplementation::isNewbieHelper() const {
-	return (characterBitmask & ((uint32)NEWBIEHELPER)) != 0;
+	return playerBitmask.hasPlayerBit(PlayerBitmasks::NEWBIEHELPER);
 }
 
 bool PlayerObjectImplementation::isLFG() const {
-	return (characterBitmask & ((uint32)LFG)) != 0;
-}
-
-bool PlayerObjectImplementation::clearCharacterBit(uint32 bit, bool notifyClient) {
-	if (characterBitmask & bit) {
-		characterBitmask &= ~bit;
-
-		if (notifyClient) {
-			PlayerObjectDeltaMessage3* delta = new PlayerObjectDeltaMessage3(asPlayerObject());
-			delta->updateCharacterBitmask(characterBitmask);
-			delta->close();
-
-			broadcastMessage(delta, true);
-		}
-
-		return true;
-	} else
-		return false;
+	return playerBitmask.hasPlayerBit(PlayerBitmasks::LFG);
 }
 
 void PlayerObjectImplementation::sendBadgesResponseTo(CreatureObject* player) {
@@ -590,7 +726,7 @@ void PlayerObjectImplementation::awardBadge(uint32 badge) {
 
 int PlayerObjectImplementation::addExperience(TransactionLog& trx, const String& xpType, int xp, bool notifyClient) {
 	if (xp == 0) {
-		trx.setExperience(xpType, 0, experienceList.contains(xpType) ? experienceList.get(xpType) : 0);
+		trx.discard();
 		return 0;
 	}
 
@@ -620,8 +756,11 @@ int PlayerObjectImplementation::addExperience(TransactionLog& trx, const String&
 	if (xpTypeCapList.contains(xpType))
 		xpCap = xpTypeCapList.get(xpType);
 
-	if (xpCap < 0)
+	if (xpType.beginsWith("prestige_")) {
+		xpCap = INT_MAX;
+	} else if (xpCap < 0) {
 		xpCap = 2000;
+	}
 
 	if (xp > xpCap) {
 		valueToAdd = xpCap - (xp - valueToAdd);
@@ -802,76 +941,278 @@ WaypointObject* PlayerObjectImplementation::addWaypoint(const String& planet, fl
 }
 
 void PlayerObjectImplementation::addAbility(Ability* ability, bool notifyClient) {
-	if (notifyClient) {
-		PlayerObjectDeltaMessage9* msg = new PlayerObjectDeltaMessage9(asPlayerObject());
-		msg->startUpdate(0);
-		abilityList.add(ability, msg, 1);
-		msg->close();
-		sendMessage(msg);
-	} else {
+	if (ability == nullptr) {
+		return;
+	}
+
+	const auto abilityName = ability->getAbilityName();
+
+	if (!abilityList.contains(abilityName)) {
 		abilityList.add(ability);
+	}
+
+	if (activeAbilities.contains(abilityName)) {
+		return;
+	}
+
+	if (notifyClient) {
+		PlayerObjectDeltaMessage9* delta9 = new PlayerObjectDeltaMessage9(asPlayerObject());
+
+		if (delta9 == nullptr) {
+			return;
+		}
+
+		delta9->startUpdate(0x0);
+
+		activeAbilities.add(ability, delta9, 1);
+
+		delta9->close();
+
+		sendMessage(delta9);
+	} else {
+		activeAbilities.add(ability);
 	}
 }
 
 void PlayerObjectImplementation::addAbilities(Vector<Ability*>& abilities, bool notifyClient) {
-	if (abilities.size() == 0)
+	if (abilities.size() == 0) {
 		return;
+	}
 
 	if (notifyClient) {
-		PlayerObjectDeltaMessage9* msg = new PlayerObjectDeltaMessage9(asPlayerObject());
-		msg->startUpdate(0);
+		auto initialAbility = abilities.get(0);
 
-		abilityList.add(abilities.get(0), msg, abilities.size());
+		if (initialAbility == nullptr) {
+			return;
+		}
 
-		for (int i = 1; i < abilities.size(); ++i)
-			abilityList.add(abilities.get(i), msg, 0);
+		const auto initAbilityName = initialAbility->getAbilityName();
 
-		msg->close();
+		PlayerObjectDeltaMessage9* delta9 = new PlayerObjectDeltaMessage9(asPlayerObject());
 
-		sendMessage(msg);
+		if (delta9 == nullptr) {
+			return;
+		}
+
+		delta9->startUpdate(0x0);
+
+		if (!abilityList.contains(initAbilityName)) {
+			abilityList.add(initialAbility);
+		}
+
+		activeAbilities.add(initialAbility, delta9, abilities.size());
+
+		for (int i = 1; i < abilities.size(); ++i) {
+			auto ability = abilities.get(i);
+
+			if (ability == nullptr) {
+				continue;
+			}
+
+			const auto abilityName = ability->getAbilityName();
+
+			if (!abilityList.contains(abilityName)) {
+				abilityList.add(ability);
+			}
+
+			activeAbilities.add(ability, delta9, 0);
+		}
+
+		delta9->close();
+
+		sendMessage(delta9);
 	} else {
-		for (int i = 0; i < abilities.size(); ++i)
-			abilityList.add(abilities.get(i));
+		for (int i = 0; i < abilities.size(); ++i) {
+			auto ability = abilities.get(i);
+
+			if (ability == nullptr) {
+				continue;
+			}
+
+			const auto abilityName = ability->getAbilityName();
+
+			if (!abilityList.contains(abilityName)) {
+				abilityList.add(ability);
+			}
+
+			if (!activeAbilities.contains(abilityName)) {
+				activeAbilities.add(ability);
+			}
+		}
 	}
 }
 
 void PlayerObjectImplementation::removeAbility(Ability* ability, bool notifyClient) {
-	int index = abilityList.find(ability);
+	int abilityIndex = abilityList.find(ability);
+	int activeIndex = activeAbilities.find(ability);
 
-	if (index == -1)
+	if (abilityIndex != -1) {
+		abilityList.remove(abilityIndex);
+	}
+
+	if (activeIndex == -1) {
 		return;
+	}
 
 	if (notifyClient) {
-		PlayerObjectDeltaMessage9* msg = new PlayerObjectDeltaMessage9(asPlayerObject());
-		msg->startUpdate(0);
-		abilityList.remove(index, msg, 1);
-		msg->close();
-		sendMessage(msg);
+		PlayerObjectDeltaMessage9* delta9 = new PlayerObjectDeltaMessage9(asPlayerObject());
+
+		if (delta9 == nullptr) {
+			return;
+		}
+
+		delta9->startUpdate(0x0);
+
+		activeAbilities.remove(activeIndex, delta9, 1);
+
+		delta9->close();
+
+		sendMessage(delta9);
+
 	} else {
-		abilityList.remove(index);
+		activeAbilities.remove(activeIndex);
 	}
 }
 
 void PlayerObjectImplementation::removeAbilities(Vector<Ability*>& abilities, bool notifyClient) {
-	if (abilities.size() == 0)
+	if (abilities.size() == 0) {
 		return;
+	}
 
 	if (notifyClient) {
-		PlayerObjectDeltaMessage9* msg = new PlayerObjectDeltaMessage9(asPlayerObject());
-		msg->startUpdate(0);
+		auto initialAbility = abilities.get(0);
 
-		abilityList.remove(abilityList.find(abilities.get(0)), msg, abilities.size());
+		if (initialAbility == nullptr) {
+			return;
+		}
 
-		for (int i = 1; i < abilities.size(); ++i)
-			abilityList.remove(abilityList.find(abilities.get(i)), msg, 0);
+		PlayerObjectDeltaMessage9* delta9 = new PlayerObjectDeltaMessage9(asPlayerObject());
 
-		msg->close();
+		if (delta9 == nullptr) {
+			return;
+		}
 
-		sendMessage(msg);
+		delta9->startUpdate(0x0);
+
+		abilityList.remove(abilityList.find(initialAbility));
+		activeAbilities.remove(activeAbilities.find(initialAbility), delta9, abilities.size());
+
+		for (int i = 1; i < abilities.size(); ++i) {
+			auto ability = abilities.get(i);
+
+			if (ability == nullptr) {
+				continue;
+			}
+
+			abilityList.remove(abilityList.find(ability));
+			activeAbilities.remove(activeAbilities.find(ability), delta9, 0);
+		}
+
+		delta9->close();
+
+		sendMessage(delta9);
 	} else {
-		for (int i = 0; i < abilities.size(); ++i)
-			abilityList.remove(abilityList.find(abilities.get(i)));
+		for (int i = 0; i < abilities.size(); ++i) {
+			auto ability = abilities.get(i);
+
+			if (ability == nullptr) {
+				continue;
+			}
+
+			abilityList.remove(abilityList.find(ability));
+			activeAbilities.remove(activeAbilities.find(ability));
+		}
 	}
+}
+
+void PlayerObjectImplementation::addDroidCommands(Vector<Ability*>& abilities, bool notifyClient) {
+	if (abilities.size() == 0) {
+		return;
+	}
+
+	if (notifyClient) {
+		auto initialAbility = abilities.get(0);
+
+		if (initialAbility == nullptr) {
+			return;
+		}
+
+		PlayerObjectDeltaMessage9* delta9 = new PlayerObjectDeltaMessage9(asPlayerObject());
+
+		if (delta9 == nullptr) {
+			return;
+		}
+
+		delta9->startUpdate(0x0);
+
+		droidCommandList.add(initialAbility);
+		activeAbilities.add(initialAbility, delta9, abilities.size());
+
+		for (int i = 1; i < abilities.size(); ++i) {
+			auto ability = abilities.get(i);
+
+			if (ability == nullptr) {
+				continue;
+			}
+
+			droidCommandList.add(ability);
+			activeAbilities.add(ability, delta9, 0);
+		}
+
+		delta9->close();
+
+		sendMessage(delta9);
+	} else {
+		for (int i = 0; i < abilities.size(); ++i) {
+			auto ability = abilities.get(i);
+
+			if (ability == nullptr) {
+				continue;
+			}
+
+			droidCommandList.add(ability);
+			activeAbilities.add(ability);
+		}
+	}
+}
+
+void PlayerObjectImplementation::removeDroidCommands() {
+	if (droidCommandList.size() == 0) {
+		return;
+	}
+
+	auto initialAbility = droidCommandList.get(0);
+
+	if (initialAbility == nullptr) {
+		return;
+	}
+
+	PlayerObjectDeltaMessage9* delta9 = new PlayerObjectDeltaMessage9(asPlayerObject());
+
+	if (delta9 == nullptr) {
+		return;
+	}
+
+	delta9->startUpdate(0x0);
+
+	activeAbilities.remove(activeAbilities.find(initialAbility), delta9, droidCommandList.size());
+
+	for (int i = 1; i < droidCommandList.size(); i++) {
+		auto ability = droidCommandList.get(i);
+
+		if (ability == nullptr) {
+			continue;
+		}
+
+		activeAbilities.remove(activeAbilities.find(ability), delta9, 0);
+	}
+
+	delta9->close();
+
+	sendMessage(delta9);
+
+	// Clear the droid commands
+	droidCommandList.removeAll();
 }
 
 bool PlayerObjectImplementation::addSchematics(Vector<ManagedReference<DraftSchematic* > >& schematics, bool notifyClient) {
@@ -1030,6 +1371,15 @@ void PlayerObjectImplementation::doDigest(int fillingReduction) {
 	}
 }
 
+void PlayerObjectImplementation::setSavedTerrainName(const String& zoneName) {
+	if (zoneName.isEmpty()) {
+		error() << "PlayerObject attempting to set empty terrain name -- ID: " << getObjectID();
+		return;
+	}
+
+	savedTerrainName = zoneName;
+}
+
 Vector<ManagedReference<DraftSchematic* > > PlayerObjectImplementation::filterSchematicList(
 		CreatureObject* player, Vector<uint32>* enabledTabs, int complexityLevel) {
 
@@ -1066,8 +1416,13 @@ void PlayerObjectImplementation::addFriend(const String& name, bool notifyClient
 	if (playerToAddGhost == nullptr)
 		return;
 
-	if (strongParent != nullptr && strongParent->isCreatureObject())
-		playerToAddGhost->addReverseFriend(cast<CreatureObject*>(strongParent.get())->getFirstName());
+	String firstName = "";
+
+	if (strongParent != nullptr && strongParent->isCreatureObject()) {
+		firstName = cast<CreatureObject*>(strongParent.get())->getFirstName();
+		playerToAddGhost->addReverseFriend(firstName);
+	}
+
 	playerToAddGhost->updateToDatabase();
 
 	if (notifyClient && strongParent != nullptr) {
@@ -1077,7 +1432,8 @@ void PlayerObjectImplementation::addFriend(const String& name, bool notifyClient
 		ChatOnChangeFriendStatus* add = new ChatOnChangeFriendStatus(strongParent->getObjectID(),	nameLower, zoneServer->getGalaxyName(), true);
 		strongParent->sendMessage(add);
 
-		if (playerToAdd->isOnline()) {
+		// other player is online and is not ignoring this player?
+		if (playerToAdd->isOnline() && !playerToAddGhost->isIgnoring(firstName)) {
 			ChatFriendsListUpdate* notifyStatus = new ChatFriendsListUpdate(nameLower, zoneServer->getGalaxyName(), true);
 			strongParent->sendMessage(notifyStatus);
 		}
@@ -1327,24 +1683,27 @@ void PlayerObjectImplementation::setTitle(const String& characterTitle, bool not
 void PlayerObjectImplementation::notifyOnline() {
 	ManagedReference<SceneObject*> parent = getParent().get();
 
-	if (parent == nullptr)
+	if (parent == nullptr) {
 		return;
+	}
 
 	CreatureObject* playerCreature = parent->asCreatureObject();
-	if (playerCreature == nullptr)
+
+	if (playerCreature == nullptr) {
 		return;
+	}
 
 	miliSecsSession = 0;
 
 	resetSessionStats(true);
 
-#ifdef WITH_SESSION_API
+#ifdef WITH_SWGREALMS_API
 	auto client = playerCreature->getClient();
 
 	// NOTE: Call after resetSessionStats so first session_stats has been saved and can be inspected
-	SessionAPIClient::instance()->notifyPlayerOnline(client != nullptr ? client->getIPAddress() : sessionStatsIPAddress,
+	SWGRealmsAPI::instance()->notifyPlayerOnline(client != nullptr ? client->getIPAddress() : sessionStatsIPAddress,
 			getAccountID(), playerCreature->getObjectID());
-#endif // WITH_SESSION_API
+#endif // WITH_SWGREALMS_API
 
 	ChatManager* chatManager = server->getChatManager();
 	ZoneServer* zoneServer = server->getZoneServer();
@@ -1539,13 +1898,13 @@ void PlayerObjectImplementation::notifyOffline() {
 
 	logSessionStats(true);
 
-#ifdef WITH_SESSION_API
+#ifdef WITH_SWGREALMS_API
 	auto client = playerCreature->getClient();
 
 	// NOTE: Call after logSessionStats so session_stats has been saved and can be inspected
-	SessionAPIClient::instance()->notifyPlayerOffline(client != nullptr ? client->getIPAddress() : sessionStatsIPAddress, getAccountID(),
+	SWGRealmsAPI::instance()->notifyPlayerOffline(client != nullptr ? client->getIPAddress() : sessionStatsIPAddress, getAccountID(),
 			playerCreature->getObjectID());
-#endif // WITH_SESSION_API
+#endif // WITH_SWGREALMS_API
 }
 
 void PlayerObjectImplementation::incrementSessionMovement(float moveDelta) {
@@ -1648,7 +2007,8 @@ void PlayerObjectImplementation::logSessionStats(bool isSessionEnd) {
 		ipAccountCount = loggedInAccounts.size();
 	}
 
-	// Need the session_stats table to log to database
+	// Log session statistics
+#ifndef WITH_SWGREALMS_API
 	if (ServerCore::getSchemaVersion() >= 1003) {
 		StringBuffer query;
 
@@ -1699,6 +2059,28 @@ void PlayerObjectImplementation::logSessionStats(bool isSessionEnd) {
 
 		info(logMsg.toString(), true);
 	}
+#else // WITH_SWGREALMS_API
+
+	// API mode: Use TransactionLog with SESSIONSTATS code
+	if (parent != nullptr) {
+		CreatureObject* creature = parent->asCreatureObject();
+
+		if (creature != nullptr) {
+			TransactionLog trx(TrxCode::SESSIONSTATS, creature);
+
+			trx.addState("uptime", (int)(uptime / 1000.0f));
+			trx.addState("dstSessionEnd", isSessionEnd);
+			trx.addState("dstDeltaSeconds", (int)(sessionStatsMiliSecs / 1000.0f));
+			trx.addState("dstDeltaCredits", creditsDelta);
+			trx.addState("dstDeltaSkillPoints", skillPointDelta);
+			trx.addState("dstActivityXP", sessionStatsActivityXP);
+			trx.addState("dstCurrentCredits", currentCredits);
+			trx.addState("dstIPAccountCount", ipAccountCount);
+
+			trx.commit();
+		}
+	}
+#endif // WITH_SWGREALMS_API
 
 	resetSessionStats(false);
 }
@@ -1718,11 +2100,17 @@ void PlayerObjectImplementation::setLanguageID(byte language, bool notifyClient)
 }
 
 void PlayerObjectImplementation::toggleCharacterBit(uint32 bit) {
-	if (characterBitmask & bit) {
-		clearCharacterBit(bit, true);
+	if (playerBitmask.hasPlayerBit(bit)) {
+		playerBitmask.clearOneBit(bit);
 	} else {
-		setCharacterBit(bit, true);
+		playerBitmask.setOneBit(bit);
 	}
+
+	PlayerObjectDeltaMessage3* delta = new PlayerObjectDeltaMessage3(asPlayerObject());
+	delta->updatePlayerBitmasks();
+	delta->close();
+
+	broadcastMessage(delta, true);
 }
 
 void PlayerObjectImplementation::setFoodFilling(int newValue, bool notifyClient) {
@@ -1757,9 +2145,14 @@ void PlayerObjectImplementation::increaseFactionStanding(const String& factionNa
 	if (amount < 0)
 		return; //Don't allow negative values to be sent to this method.
 
-	CreatureObject* player = cast<CreatureObject*>( parent.get().get());
+	CreatureObject* player = cast<CreatureObject*>(parent.get().get());
+
 	if (player == nullptr)
 		return;
+
+	uint32 factionHash = factionName.hashCode();
+	uint32 factionCRC = 0;
+	bool playerIsFaction = player->getFaction() == factionHash;
 
 	//Get the current amount of faction standing
 	float currentAmount = factionStandingList.getFactionStanding(factionName);
@@ -1769,10 +2162,16 @@ void PlayerObjectImplementation::increaseFactionStanding(const String& factionNa
 
 	if (!factionStandingList.isPvpFaction(factionName))
 		newAmount = Math::min(5000.f, newAmount);
-	else if (player->getFaction() == factionName.hashCode())
+	else if (playerIsFaction) {
+		if (factionHash == STRING_HASHCODE("rebel"))
+			factionCRC = Factions::FACTIONREBEL;
+		else if (factionHash == STRING_HASHCODE("imperial"))
+			factionCRC = Factions::FACTIONIMPERIAL;
+
 		newAmount = Math::min((float) FactionManager::instance()->getFactionPointsCap(player->getFactionRank()), newAmount);
-	else
+	} else {
 		newAmount = Math::min(1000.f, newAmount);
+	}
 
 	factionStandingList.put(factionName, newAmount);
 
@@ -1787,8 +2186,42 @@ void PlayerObjectImplementation::increaseFactionStanding(const String& factionNa
 		if (change == 0)
 			msg.setStringId("@base_player:prose_max_faction");
 
-
 		player->sendSystemMessage(msg);
+
+		PlayerManager* playerManager = server->getPlayerManager();
+
+		// Need to give Cries of Alderaan Faction Bonus only if they are not maxed already
+		if (change > 0 && playerIsFaction && (playerManager != nullptr && playerManager->getCoaWinningFaction() == factionCRC)) {
+			giveCoaBonus(factionName, amount, newAmount);
+		}
+	}
+}
+
+void PlayerObjectImplementation::giveCoaBonus(const String& factionName, float amount, float currentStanding) {
+	CreatureObject* player = cast<CreatureObject*>(parent.get().get());
+
+	if (player == nullptr)
+		return;
+
+	int bonus = amount * 0.1f;
+
+	if (bonus < 1) {
+		return;
+	}
+
+	float newStanding = bonus + currentStanding;
+
+	newStanding = Math::min((float) FactionManager::instance()->getFactionPointsCap(player->getFactionRank()), newStanding);
+
+	if (newStanding > 0) {
+		factionStandingList.put(factionName, newStanding);
+		int bonusApplied = floor(newStanding - currentStanding);
+
+		StringIdChatParameter coaBonus("@base_player:prose_coa_bonus");
+
+		coaBonus.setDI(bonusApplied);
+		coaBonus.setTO("@faction/faction_names:" + factionName);
+		player->sendSystemMessage(coaBonus);
 	}
 }
 
@@ -1901,7 +2334,7 @@ void PlayerObjectImplementation::logout(bool doLock) {
 			if (creature == nullptr)
 				return;
 
-			int isInSafeArea = creature->getSkillMod("private_safe_logout") || ConfigManager::instance()->getBool("Core3.Tweaks.PlayerObject.AlwaysSafeLogout", false);
+			int isInSafeArea = creature->getSkillMod("private_safe_logout") || ConfigManager::instance()->getBool("Core3.PlayerObject.AlwaysSafeLogout", false);
 
 			info("creating disconnect event: isInSafeArea=" + String::valueOf(isInSafeArea), true);
 
@@ -1938,6 +2371,7 @@ void PlayerObjectImplementation::doRecovery(int latency) {
 	}
 
 	ZoneServer* zoneServer = creature->getZoneServer();
+
 	if (zoneServer == nullptr) {
 		return;
 	}
@@ -1978,36 +2412,61 @@ void PlayerObjectImplementation::doRecovery(int latency) {
 	}
 
 	if (isOnline()) {
-		const CommandQueueActionVector* commandQueue = creature->getCommandQueue();
-		const CommandQueueActionVector* immediateQueue = creature->getImmediateQueue();
-
-		if (creature->isInCombat() && creature->getTargetID() != 0 && !creature->isPeaced() && !creature->hasBuff(STRING_HASHCODE("private_feign_buff")) && (commandQueue->size() == 0) && (immediateQueue->size() == 0)
-		&& creature->isNextActionPast() && !creature->isDead() && !creature->isIncapacitated() && cooldownTimerMap->isPast("autoAttackDelay") && !creature->hasAttackDelay() && !creature->hasPostureChangeDelay()) {
+		if (creature->isInCombat() && creature->getTargetID() != 0 && !creature->isPeaced() && !creature->hasBuff(STRING_HASHCODE("private_feign_buff")) && !creature->hasAttackDelay() && !creature->hasPostureChangeDelay() &&
+		creature->isNextActionPast() && creature->getCommandQueueSize() == 0 && !creature->isDead() && !creature->isIncapacitated() && cooldownTimerMap->isPast("autoAttackDelay")) {
 
 			ManagedReference<SceneObject*> targetObject = zoneServer->getObject(creature->getTargetID());
 
 			if (targetObject != nullptr) {
-				if (targetObject->isInRange(creature, Math::max(10, creature->getWeapon()->getMaxRange()) + targetObject->getTemplateRadius() + creature->getTemplateRadius())) {
-					creature->executeObjectControllerAction(STRING_HASHCODE("attack"), creature->getTargetID(), "");
+				WeaponObject* weapon = creature->getWeapon();
+
+				if (weapon != nullptr) {
+					if (targetObject->isInRange(creature, Math::max(10, weapon->getMaxRange()) + targetObject->getTemplateRadius() + creature->getTemplateRadius())) {
+						creature->executeObjectControllerAction(STRING_HASHCODE("attack"), creature->getTargetID(), "");
+					}
+
+					float weaponSpeed = CombatManager::instance()->calculateWeaponAttackSpeed(creature, weapon, 1.f);
+					float delay = weaponSpeed * 1000;
+
+					Locker lock(creature);
+
+					// as long as the target is still valid, we still want to continue to queue auto attacks
+					cooldownTimerMap->updateToCurrentAndAddMili("autoAttackDelay", (uint64)delay);
 				}
-
-				float weaponSpeed = ((uint64)(CombatManager::instance()->calculateWeaponAttackSpeed(creature, creature->getWeapon(), 1.f)));
-
-				// as long as the target is still valid, we still want to continue to queue auto attacks
-				cooldownTimerMap->updateToCurrentAndAddMili("autoAttackDelay", (weaponSpeed) * 1000.f);
 			} else {
 				creature->setTargetID(0);
 			}
 		}
 
-		if (!getZoneServer()->isServerLoading() && cooldownTimerMap->isPast("weatherEvent")) {
-			if (creature->getZone() != nullptr && creature->getZone()->getPlanetManager() != nullptr) {
-				ManagedReference<WeatherManager*> weatherManager = creature->getZone()->getPlanetManager()->getWeatherManager();
+		auto zoneServer = getZoneServer();
 
-				if (weatherManager != nullptr)
-					weatherManager->sendWeatherTo(creature);
+		if (zoneServer != nullptr && !zoneServer->isServerLoading()) {
+			auto zone = creature->getZone();
 
-				cooldownTimerMap->updateToCurrentAndAddMili("weatherEvent", 3000);
+			if (zone != nullptr) {
+				if (cooldownTimerMap->isPast("weatherEvent")) {
+					auto planetManager = zone->getPlanetManager();
+
+					if (planetManager != nullptr) {
+						ManagedReference<WeatherManager*> weatherManager = planetManager->getWeatherManager();
+
+						if (weatherManager != nullptr) {
+							weatherManager->sendWeatherTo(creature);
+						}
+
+						cooldownTimerMap->updateToCurrentAndAddMili("weatherEvent", 3000);
+					}
+				}
+
+				if (cooldownTimerMap->isPast("planetTimeEvent")) {
+					ServerTimeMessage* stm = new ServerTimeMessage(creature->getZone());
+
+					if (stm != nullptr) {
+						sendMessage(stm);
+					}
+
+					cooldownTimerMap->updateToCurrentAndAddMili("planetTimeEvent", 60000);
+				}
 			}
 		}
 
@@ -2019,107 +2478,7 @@ void PlayerObjectImplementation::doRecovery(int latency) {
 			logSessionStats(false);
 	}
 
-	if (cooldownTimerMap->isPast("spawnCheckTimer")) {
-		checkForNewSpawns();
-		cooldownTimerMap->updateToCurrentAndAddMili("spawnCheckTimer", 3000);
-	}
-
 	activateRecovery();
-}
-
-void PlayerObjectImplementation::checkForNewSpawns() {
-	ManagedReference<CreatureObject*> creature = dynamic_cast<CreatureObject*>(parent.get().get());
-
-	if (creature->isInvisible()) {
-		return;
-	}
-
-	ManagedReference<SceneObject*> parent = creature->getParent().get();
-
-	if (parent != nullptr && parent->isCellObject()) {
-		return;
-	}
-
-	if (creature->getCityRegion() != nullptr) {
-		return;
-	}
-
-	SortedVector<ManagedReference<ActiveArea* > > areas = *creature->getActiveAreas();
-	Vector<SpawnArea*> spawnAreas;
-	int totalWeighting = 0;
-
-	bool includeWorldSpawnAreas = true;
-	Vector<SpawnArea*> worldSpawnAreas;
-
-	for (int i = 0; i < areas.size(); ++i) {
-		ManagedReference<ActiveArea*>& area = areas.get(i);
-
-		if (area->isNoSpawnArea()) {
-			return;
-		}
-
-		SpawnArea* spawnArea = area.castTo<SpawnArea*>();
-
-		if (spawnArea == nullptr) {
-			continue;
-		}
-
-		int tier = spawnArea->getTier();
-
-		if (!(tier & SpawnAreaMap::SPAWNAREA)) {
-			continue;
-		}
-
-		if (tier & SpawnAreaMap::WORLDSPAWNAREA) {
-			worldSpawnAreas.add(spawnArea);
-			continue;
-		}
-
-		if (tier & SpawnAreaMap::NOWORLDSPAWNAREA) {
-			includeWorldSpawnAreas = false;
-		}
-
-		spawnAreas.add(spawnArea);
-		totalWeighting += spawnArea->getTotalWeighting();
-	}
-
-	if (includeWorldSpawnAreas) {
-		for (int i = 0; i < worldSpawnAreas.size(); ++i) {
-			SpawnArea* currentWorldSpawnArea = worldSpawnAreas.get(i);
-			spawnAreas.add(currentWorldSpawnArea);
-			totalWeighting += currentWorldSpawnArea->getTotalWeighting();
-		}
-	}
-
-	int choice = System::random(totalWeighting - 1);
-	int counter = 0;
-	ManagedReference<SpawnArea*> finalArea = nullptr;
-
-	for (int i = 0; i < spawnAreas.size(); i++) {
-		SpawnArea* area = spawnAreas.get(i);
-
-		counter += area->getTotalWeighting();
-
-		if (choice < counter) {
-			finalArea = area;
-			break;
-		}
-	}
-
-	if (finalArea == nullptr) {
-		return;
-	}
-
-	String zoneName;
-	auto zone = creature->getZone();
-
-	if (zone != nullptr) {
-		zoneName = zone->getZoneName();
-	}
-
-	Core::getTaskManager()->executeTask([=] () {
-		finalArea->tryToSpawn(creature);
-	}, "TryToSpawnLambda", zoneName.toCharArray());
 }
 
 void PlayerObjectImplementation::activateRecovery() {
@@ -2189,12 +2548,15 @@ void PlayerObjectImplementation::setLinkDead(bool isSafeLogout) {
 	trx.addState("isSafeLogout", isSafeLogout);
 
 	logoutTimeStamp.updateToCurrentTime();
-	if(!isSafeLogout) {
+
+	// info(true) << creature->getDisplayedName() << " -- PlayerObjectImplementation::setLinkDead";
+
+	if (!isSafeLogout) {
 		info("went link dead");
-		logoutTimeStamp.addMiliTime(ConfigManager::instance()->getInt("Core3.Tweaks.PlayerObject.LinkDeadDelay", 3 * 60) * 1000); // 3 minutes if unsafe
+		logoutTimeStamp.addMiliTime(ConfigManager::instance()->getInt("Core3.PlayerObject.LinkDeadDelay", 3 * 60) * 1000); // 3 minutes if unsafe
 	}
 
-	setCharacterBit(PlayerObjectImplementation::LD, true);
+	setPlayerBit(PlayerBitmasks::LD, true);
 
 	activateRecovery();
 
@@ -2208,7 +2570,13 @@ void PlayerObjectImplementation::setOnline() {
 
 	TransactionLog trx(TrxCode::PLAYERONLINE, getParentRecursively(SceneObjectType::PLAYERCREATURE));
 
-	clearCharacterBit(PlayerObjectImplementation::LD, true);
+	clearPlayerBit(PlayerBitmasks::LD, true);
+
+	PlayerObjectDeltaMessage3* dplay3 = new PlayerObjectDeltaMessage3(asPlayerObject());
+	dplay3->setBirthDate();
+	dplay3->setTotalPlayTime();
+	dplay3->close();
+	broadcastMessage(dplay3, true);
 
 	doRecovery(1000);
 
@@ -2257,8 +2625,7 @@ void PlayerObjectImplementation::disconnect(bool closeClient, bool doLock) {
 	if (creature == nullptr)
 		return;
 
-	Vector3 position = getWorldPosition();
-	setLastLogoutWorldPosition(position);
+	setLastLogoutWorldPosition();
 
 	if (!isOnline()) {
 		auto owner = creature->getClient();
@@ -2487,9 +2854,9 @@ void PlayerObjectImplementation::updateLastCombatActionTimestamp(bool updateGcwC
 
 	schedulePvpTefRemovalTask();
 
-	if (!alreadyHasTef) {
+	if (!alreadyHasTef && (updateGcwCrackdownAction || updateGcwAction || updateBhAction)) {
 		updateInRangeBuildingPermissions();
-		parent->setPvpStatusBit(CreatureFlag::TEF);
+		parent->setPvpStatusBit(ObjectFlag::TEF);
 	}
 }
 
@@ -2510,9 +2877,9 @@ void PlayerObjectImplementation::updateLastPvpAreaCombatActionTimestamp() {
 	lastPvpAreaCombatActionTimestamp.updateToCurrentTime();
 	lastPvpAreaCombatActionTimestamp.addMiliTime(FactionManager::TEFTIMER);
 
-	if (!(parent->getPvpStatusBitmask() & CreatureFlag::TEF)) {
+	if (!(parent->getPvpStatusBitmask() & ObjectFlag::TEF)) {
 		updateInRangeBuildingPermissions();
-		parent->setPvpStatusBit(CreatureFlag::TEF);
+		parent->setPvpStatusBit(ObjectFlag::TEF);
 	}
 
 	schedulePvpTefRemovalTask();
@@ -2524,6 +2891,10 @@ bool PlayerObjectImplementation::hasTef() const {
 
 bool PlayerObjectImplementation::hasPvpTef() const {
 	return !lastGcwPvpCombatActionTimestamp.isPast() || hasBhTef() || !lastPvpAreaCombatActionTimestamp.isPast();
+}
+
+bool PlayerObjectImplementation::hasGcwTef() const {
+	return !lastGcwPvpCombatActionTimestamp.isPast();
 }
 
 bool PlayerObjectImplementation::hasBhTef() const {
@@ -2564,6 +2935,7 @@ void PlayerObjectImplementation::schedulePvpTefRemovalTask(bool removeCrackdownG
 
 		if (removeGcwTefNow) {
 			lastGcwPvpCombatActionTimestamp.updateToCurrentTime();
+			lastPvpAreaCombatActionTimestamp.updateToCurrentTime();
 		}
 
 		if (removeBhTefNow) {
@@ -2598,7 +2970,7 @@ void PlayerObjectImplementation::schedulePvpTefRemovalTask(bool removeNow) {
 	schedulePvpTefRemovalTask(removeNow, removeNow, removeNow);
 }
 
-Vector3 PlayerObjectImplementation::getTrainerCoordinates() const {
+Vector3 PlayerObjectImplementation::getJediTrainerCoordinates() const {
 	return trainerCoordinates;
 }
 
@@ -2633,7 +3005,7 @@ void PlayerObjectImplementation::updateInRangeBuildingPermissions() {
 
 	CloseObjectsVector* vec = (CloseObjectsVector*) parent->getCloseObjects();
 
-	SortedVector<QuadTreeEntry*> closeObjects;
+	SortedVector<TreeEntry*> closeObjects;
 	vec->safeCopyReceiversTo(closeObjects, CloseObjectsVector::STRUCTURETYPE);
 
 	for (int i = 0; i < closeObjects.size(); ++i) {
@@ -2702,6 +3074,21 @@ void PlayerObjectImplementation::destroyObjectFromDatabase(bool destroyContained
 							}, "SetMayorIDLambda");
 						}
 					}
+
+					continue;
+				} else if (structure->isGCWBase()) {
+					Reference<BuildingObject*> baseRef = structure->asBuildingObject();
+					Reference<Zone*> zoneRef = zone;
+
+					Core::getTaskManager()->executeTask([baseRef, zoneRef] () {
+						if (baseRef == nullptr || zoneRef == nullptr)
+							return;
+
+						GCWManager* gcwMan = zoneRef->getGCWManager();
+
+						if (gcwMan != nullptr)
+							gcwMan->scheduleBaseDestruction(baseRef, nullptr, true);
+					}, "DestroyBaseLambda");
 
 					continue;
 				}
@@ -2792,18 +3179,21 @@ int PlayerObjectImplementation::getOwnedChatRoomCount() {
 void PlayerObjectImplementation::activateJournalQuest(unsigned int questCrc, bool notifyClient) {
 	PlayerQuestData questData = getQuestData(questCrc);
 
-	if (questData.getOwnerId() != 0)
+	if (questData.getOwnerId() != 0) {
 		return;
+	}
 
 	CreatureObject* creature = cast<CreatureObject*>(getParent().get().get());
 
-	if (creature == nullptr)
+	if (creature == nullptr) {
 		return;
+	}
 
 	questData.setOwnerId(getObjectID());
 	questData.setActiveStepBitmask(0);
 	questData.setCompletedStepBitmask(0);
 	questData.setCompletedFlag(0);
+
 	setPlayerQuestData(questCrc, questData);
 
 	activateJournalQuestTask(questCrc, 0, notifyClient);
@@ -2812,13 +3202,15 @@ void PlayerObjectImplementation::activateJournalQuest(unsigned int questCrc, boo
 void PlayerObjectImplementation::completeJournalQuest(unsigned int questCrc, bool notifyClient) {
 	PlayerQuestData questData = getQuestData(questCrc);
 
-	if (questData.getOwnerId() == 0)
+	if (questData.getOwnerId() == 0) {
 		return;
+	}
 
 	CreatureObject* creature = cast<CreatureObject*>(getParent().get().get());
 
-	if (creature == nullptr)
+	if (creature == nullptr) {
 		return;
+	}
 
 	questData.setCompletedFlag(1);
 	setPlayerQuestData(questCrc, questData);
@@ -2830,13 +3222,15 @@ void PlayerObjectImplementation::completeJournalQuest(unsigned int questCrc, boo
 void PlayerObjectImplementation::clearJournalQuest(unsigned int questCrc, bool notifyClient) {
 	PlayerQuestData questData = getQuestData(questCrc);
 
-	if (questData.getOwnerId() == 0)
+	if (questData.getOwnerId() == 0) {
 		return;
+	}
 
 	CreatureObject* creature = cast<CreatureObject*>(getParent().get().get());
 
-	if (creature == nullptr)
+	if (creature == nullptr) {
 		return;
+	}
 
 	clearPlayerQuestData(questCrc);
 
@@ -2845,79 +3239,111 @@ void PlayerObjectImplementation::clearJournalQuest(unsigned int questCrc, bool n
 }
 
 void PlayerObjectImplementation::activateJournalQuestTask(unsigned int questCrc, int taskNum, bool notifyClient) {
-	if (taskNum > 15)
+	if (taskNum > 15) {
 		return;
+	}
 
 	PlayerQuestData questData = getQuestData(questCrc);
 
-	if (questData.getOwnerId() == 0)
+	if (questData.getOwnerId() == 0) {
 		return;
+	}
 
-	if (questData.getActiveStepBitmask() & (1 << taskNum))
+	if (questData.getActiveStepBitmask() & (1 << taskNum)) {
 		return;
+	}
 
 	CreatureObject* creature = cast<CreatureObject*>(getParent().get().get());
 
-	if (creature == nullptr)
+	if (creature == nullptr) {
 		return;
+	}
 
-	questData.setActiveStepBitmask(questData.getActiveStepBitmask() | (1 << taskNum));
-	questData.setCompletedStepBitmask(questData.getCompletedStepBitmask() & ~(1 << taskNum));
+	uint16 activeStepBit = questData.getActiveStepBitmask();
+	uint16 completedStepBit = questData.getCompletedStepBitmask();
+
+	questData.setActiveStepBitmask(activeStepBit | (1 << taskNum));
+	questData.setCompletedStepBitmask(completedStepBit & ~(1 << taskNum));
+
+	// creature->info(true) << "activateJournalQuestTask -- Quest: " << questCrc << " Active Step Bitmask: " << activeStepBit << " Complete Step Bit: " << completedStepBit;
+
 	setPlayerQuestData(questCrc, questData);
 
-	if (notifyClient)
+	if (notifyClient) {
 		creature->sendSystemMessage("@quest/quests:quest_journal_updated");
+	}
 }
 
 void PlayerObjectImplementation::completeJournalQuestTask(unsigned int questCrc, int taskNum, bool notifyClient) {
-	if (taskNum > 15)
+	if (taskNum > 15) {
 		return;
+	}
 
 	PlayerQuestData questData = getQuestData(questCrc);
 
-	if (questData.getOwnerId() == 0)
+	if (questData.getOwnerId() == 0) {
 		return;
+	}
 
-	if ((questData.getActiveStepBitmask() & (1 << taskNum)) == 0)
+	if ((questData.getActiveStepBitmask() & (1 << taskNum)) == 0) {
 		return;
+	}
 
 	CreatureObject* creature = cast<CreatureObject*>(getParent().get().get());
 
-	if (creature == nullptr)
+	if (creature == nullptr) {
 		return;
+	}
 
-	questData.setActiveStepBitmask(questData.getActiveStepBitmask() & ~(1 << taskNum));
-	questData.setCompletedStepBitmask(questData.getCompletedStepBitmask() | (1 << taskNum));
+	uint16 activeStepBit = questData.getActiveStepBitmask();
+	uint16 completedStepBit = questData.getCompletedStepBitmask();
+
+	questData.setActiveStepBitmask(activeStepBit & ~(1 << taskNum));
+	questData.setCompletedStepBitmask(completedStepBit | (1 << taskNum));
+
+	// creature->info(true) << "completeJournalQuestTask -- Quest: " << questCrc << " Active Step Bitmask: " << activeStepBit << " Complete Step Bit: " << completedStepBit;
+
 	setPlayerQuestData(questCrc, questData);
 
-	if (notifyClient)
+	if (notifyClient) {
 		creature->sendSystemMessage("@quest/quests:task_complete");
+	}
 }
 
 void PlayerObjectImplementation::clearJournalQuestTask(unsigned int questCrc, int taskNum, bool notifyClient) {
-	if (taskNum > 15)
+	if (taskNum > 15) {
 		return;
+	}
 
 	PlayerQuestData questData = getQuestData(questCrc);
 
-	if (questData.getOwnerId() == 0)
+	if (questData.getOwnerId() == 0) {
 		return;
+	}
 
 	CreatureObject* creature = cast<CreatureObject*>(getParent().get().get());
 
-	if (creature == nullptr)
+	if (creature == nullptr) {
 		return;
+	}
 
 	questData.setActiveStepBitmask(questData.getActiveStepBitmask() & ~(1 << taskNum));
 	questData.setCompletedStepBitmask(questData.getCompletedStepBitmask() & ~(1 << taskNum));
+
 	setPlayerQuestData(questCrc, questData);
 
-	if (notifyClient)
+	if (notifyClient) {
 		creature->sendSystemMessage("@quest/quests:quest_journal_updated");
+	}
 }
 
 bool PlayerObjectImplementation::isJournalQuestActive(unsigned int questCrc) {
 	PlayerQuestData questData = getQuestData(questCrc);
+
+	if (questData.getCompletedFlag()) {
+		return false;
+	}
+
 	return questData.getOwnerId() ? true : false;
 }
 
@@ -3033,23 +3459,27 @@ bool PlayerObjectImplementation::canActivateQuest(int questID) {
 }
 
 void PlayerObjectImplementation::activateQuest(int questID) {
-	if (!canActivateQuest(questID))
+	if (!canActivateQuest(questID)) {
 		return;
+	}
 
 	CreatureObject* creature = cast<CreatureObject*>(getParent().get().get());
 
-	if (creature == nullptr)
+	if (creature == nullptr) {
 		return;
+	}
 
 	PlayerManager* playerManager = creature->getZoneServer()->getPlayerManager();
 
-	if (playerManager == nullptr)
+	if (playerManager == nullptr) {
 		return;
+	}
 
 	Reference<QuestInfo*> questInfo = playerManager->getQuestInfo(questID);
 
-	if (questInfo == nullptr)
+	if (questInfo == nullptr) {
 		return;
+	}
 
 	setActiveQuestsBit(questID, 1);
 
@@ -3064,7 +3494,7 @@ void PlayerObjectImplementation::setActiveQuestsBit(int bitIndex, byte value, bo
 		return;
 
 	PlayerObjectDeltaMessage8* delta = new PlayerObjectDeltaMessage8(this);
-	delta->startUpdate(5);
+	delta->startUpdate(0x05);
 	activeQuests.insertToMessage(delta);
 	delta->close();
 
@@ -3100,11 +3530,13 @@ void PlayerObjectImplementation::completeQuest(int questID) {
 void PlayerObjectImplementation::setCompletedQuestsBit(int bitIndex, byte value, bool notifyClient) {
 	completedQuests.setBit(bitIndex, value);
 
-	if (!notifyClient)
+	if (!notifyClient) {
 		return;
+	}
 
 	PlayerObjectDeltaMessage8* delta = new PlayerObjectDeltaMessage8(this);
-	delta->startUpdate(4);
+
+	delta->startUpdate(0x04);
 	completedQuests.insertToMessage(delta);
 	delta->close();
 
@@ -3114,7 +3546,8 @@ void PlayerObjectImplementation::setCompletedQuestsBit(int bitIndex, byte value,
 void PlayerObjectImplementation::setPlayerQuestData(uint32 questCrc, PlayerQuestData& data, bool notifyClient) {
 	if (notifyClient) {
 		PlayerObjectDeltaMessage8* dplay8 = new PlayerObjectDeltaMessage8(this);
-		dplay8->startUpdate(6);
+
+		dplay8->startUpdate(0x06);
 		playerQuestsData.set(questCrc, data, dplay8, 1);
 		dplay8->close();
 
@@ -3128,7 +3561,8 @@ void PlayerObjectImplementation::clearPlayerQuestData(uint32 questCrc, bool noti
 	//This works but client has to log out and back in to see the journal update
 	if (notifyClient) {
 		PlayerObjectDeltaMessage8* dplay8 = new PlayerObjectDeltaMessage8(this);
-		dplay8->startUpdate(6);
+
+		dplay8->startUpdate(0x06);
 		playerQuestsData.drop(questCrc, dplay8, 1);
 		dplay8->close();
 
@@ -3189,6 +3623,41 @@ int PlayerObjectImplementation::getCharacterAgeInDays() {
 	int days = timeDelta / 60 / 60 / 24;
 
 	return days;
+}
+
+int PlayerObjectImplementation::getBirthDate() {
+	if (birthDate > 0)
+		return birthDate;
+
+	ManagedReference<CreatureObject*> creature = dynamic_cast<CreatureObject*>(parent.get().get());
+
+	PlayerManager* playerManager = creature->getZoneServer()->getPlayerManager();
+
+	if (account == nullptr) {
+		return 0;
+	}
+
+	Reference<CharacterList*> list = account->getCharacterList();
+
+	if (list == nullptr) {
+		return 0;
+	}
+
+	Time currentTime;
+	Time age;
+
+	for (int i = 0; i < list->size(); i++) {
+		CharacterListEntry entry = list->get(i);
+		if (entry.getObjectID() == creature->getObjectID() && entry.getGalaxyID() == creature->getZoneServer()->getGalaxyID()) {
+			age = entry.getCreationDate();
+			break;
+		}
+	}
+
+	uint32 timeDelta = currentTime.getTime() - age.getTime();
+	setBirthDate(timeDelta);
+
+	return birthDate;
 }
 
 bool PlayerObjectImplementation::hasEventPerk(const String& templatePath) const {
@@ -3279,13 +3748,15 @@ void PlayerObjectImplementation::checkAndShowTOS() {
 void PlayerObjectImplementation::recalculateForcePower() {
 	ManagedReference<SceneObject*> parent = getParent().get();
 
-	if (parent == nullptr)
+	if (parent == nullptr) {
 		return;
+	}
 
 	CreatureObject* player = parent->asCreatureObject();
 
-	if (player == nullptr)
+	if (player == nullptr) {
 		return;
+	}
 
 	int maxForce = player->getSkillMod("jedi_force_power_max");
 
@@ -3319,7 +3790,7 @@ bool PlayerObjectImplementation::isInPvpArea(bool checkTimer) {
 	for (int i = 0; i < areas.size(); ++i) {
 		ManagedReference<ActiveArea*>& area = areas.get(i);
 
-		if (area->isPvpArea()) {
+		if (area != nullptr && area->isPvpArea()) {
 			return true;
 		}
 	}
@@ -3385,4 +3856,23 @@ String PlayerObjectImplementation::getPlayedTimeString(bool verbose) const {
 	}
 
 	return buf.toString();
+}
+
+void PlayerObjectImplementation::createHelperDroid() {
+	// Only spawn droid if character is less than 1 days old
+	if (getCharacterAgeInDays() >= 1 || isPrivileged())
+		return;
+
+	CreatureObject* player = dynamic_cast<CreatureObject*>(parent.get().get());
+
+	if (player == nullptr)
+		return;
+
+	Zone* zone = player->getZone();
+
+	if (zone == nullptr || zone->getZoneName() == "tutorial")
+		return;
+
+	Reference<Task*> createDroid = new SpawnHelperDroidTask(player);
+	createDroid->schedule(5000);
 }

@@ -42,8 +42,6 @@
 
 
 object_tangible_component_droid_droid_storage_compartment = object_tangible_component_droid_shared_droid_storage_compartment:new {
-
-
 	numberExperimentalProperties = {1, 1, 1, 1, 1},
 	experimentalProperties = {"XX", "XX", "DR", "XX", "OQ"},
 	experimentalWeights = {1, 1, 1, 1, 1},

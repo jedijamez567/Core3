@@ -45,6 +45,8 @@ namespace ai {
 		int setNextPosition(lua_State* L);
 		int getMaxDistance(lua_State* L);
 		int generatePatrol(lua_State* L);
+		int clearPatrolPoints(lua_State* L);
+		int clearCurrentPath(lua_State* L);
 		int setDestination(lua_State* L);
 		int isWaiting(lua_State* L);
 		int stopWaiting(lua_State* L);
@@ -90,6 +92,7 @@ namespace ai {
 		int hasLoot(lua_State* L);
 		int isEventMob(lua_State* L);
 		int isPet(lua_State* L);
+		int isFactionPet(lua_State* L);
 		int isAggressiveTo(lua_State* L);
 		int isAttackableBy(lua_State* L);
 		int isCamouflaged(lua_State* L);
@@ -100,7 +103,6 @@ namespace ai {
 		int activateRecovery(lua_State* L);
 		int executeBehavior(lua_State* L);
 		int info(lua_State* L);
-		int spatialChat(lua_State* L);
 		int setDefender(lua_State* L);
 		int addDefender(lua_State* L);
 		int assist(lua_State* L);
@@ -120,15 +122,14 @@ namespace ai {
 		int setNoAiAggro(lua_State* L);
 		int doDespawn(lua_State* L);
 		int getCreatureTemplateName(lua_State* L);
-		int clearCreatureBit(lua_State* L);
-		int setCreatureBit(lua_State* L);
 		int isInRangeOfHome(lua_State* L);
 		int getPatrolPointsSize(lua_State* L);
-		int addCreatureFlag(lua_State* L);
-		int removeCreatureFlag(lua_State* L);
+		int addObjectFlag(lua_State* L);
+		int removeObjectFlag(lua_State* L);
 		int setAIDebug(lua_State* L);
 		int storePet(lua_State* L);
 		int setEventArea(lua_State* L);
+		int setHamRegenDisabled(lua_State* L);
 	private:
 		AiAgent* realObject;
 	};

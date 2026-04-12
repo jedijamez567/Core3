@@ -27,16 +27,28 @@ function heroOfTatMotherConvoHandler:runScreenHandlers(pConvTemplate, pPlayer, p
 			return
 		end
 
-		AiAgent(pDaughter):setFollowObject(pNpc)
-		AiAgent(pDaughter):addCreatureFlag(AI_NOAIAGGRO)
-		AiAgent(pDaughter):addCreatureFlag(AI_ESCORT)
+		-- Daughter
+		AiAgent(pDaughter):removeObjectFlag(AI_STATIONARY)
+		AiAgent(pDaughter):addObjectFlag(AI_NOAIAGGRO)
+		AiAgent(pDaughter):addObjectFlag(AI_ESCORT)
+		AiAgent(pDaughter):addObjectFlag(AI_FOLLOW)
 
+		AiAgent(pDaughter):setFollowObject(pNpc)
+		AiAgent(pDaughter):setMovementState(AI_FOLLOWING)
+
+		-- Wife
 		CreatureObject(pNpc):clearOptionBit(CONVERSABLE)
 
-		AiAgent(pNpc):addCreatureFlag(AI_NOAIAGGRO)
-		AiAgent(pNpc):addCreatureFlag(AI_ESCORT)
+		AiAgent(pNpc):removeObjectFlag(AI_STATIONARY)
+		AiAgent(pNpc):addObjectFlag(AI_NOAIAGGRO)
+		AiAgent(pNpc):addObjectFlag(AI_ESCORT)
+		AiAgent(pNpc):addObjectFlag(AI_FOLLOW)
+
 		AiAgent(pNpc):setFollowObject(pPlayer)
 		AiAgent(pNpc):setMovementState(AI_FOLLOWING)
+
+		AiAgent(pDaughter):setAITemplate()
+		AiAgent(pNpc):setAITemplate()
 
 		writeData("hero_of_tat:altruismEscortStatus", 1)
 		writeData("hero_of_tat:altruismEscorterID", SceneObject(pPlayer):getObjectID())

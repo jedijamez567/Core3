@@ -52,6 +52,7 @@ protected:
 public:
 	QueueCommand(const String& skillname, ZoneProcessServer* serv);
 
+	const static int NOCOMBATQUEUE = -1;
 	const static int IMMEDIATE = 0;
 	const static int FRONT = 1;
 	const static int NORMAL = 2;
@@ -136,6 +137,10 @@ public:
 	 */
 	bool checkStateMask(CreatureObject* creature) const {
 		return (creature->getStateBitmask() & stateMask) == 0;
+	}
+
+	bool checkSpaceStates(CreatureObject* creature) const {
+		return (creature->isPilotingShip() || creature->isInShipStation());
 	}
 
 	/**
@@ -244,6 +249,10 @@ public:
 
 	inline int getTargetType() const {
 		return targetType;
+	}
+
+	inline String getName() const {
+		return name;
 	}
 
 	inline uint32 getNameCRC() const {

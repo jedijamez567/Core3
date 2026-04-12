@@ -83,6 +83,22 @@ includeFile("conversations/events/coa/rebel_coordinator_conv.lua")
 includeFile("conversations/events/coa/rebel_lyda_conv.lua")
 includeFile("conversations/events/coa/rebel_sympathizer_conv.lua")
 
+--Coa3
+includeFile("conversations/events/coa/coa3_info_officer_conv.lua")
+includeFile("conversations/events/coa/coa3_lookout_conv.lua")
+includeFile("conversations/events/coa/coa3_caravan_leader_conv.lua")
+includeFile("conversations/events/coa/coa3_tactical_officer_conv.lua")
+includeFile("conversations/events/coa/coa3_leia_conv.lua")
+includeFile("conversations/events/coa/coa3_veers_conv.lua")
+
+-- Secrets of the Syren
+includeFile("conversations/events/syren/neutral_tyla_jinn_conv.lua")
+includeFile("conversations/events/syren/rebel_veega_madish_conv.lua")
+includeFile("conversations/events/syren/imperial_jevan_monsul_conv.lua")
+includeFile("conversations/events/syren/doctor_edvar_vang_conv.lua")
+includeFile("conversations/events/syren/kaila_min_conv.lua")
+includeFile("conversations/events/syren/tovar_blackmoor_conv.lua")
+
 -- Hero of Tat
 includeFile("conversations/tasks/hero_of_tatooine/hermit_conv.lua")
 includeFile("conversations/tasks/hero_of_tatooine/hero_of_tat_bounty_hunter_conv.lua")
@@ -92,6 +108,15 @@ includeFile("conversations/tasks/hero_of_tatooine/hero_of_tat_intercom_conv.lua"
 includeFile("conversations/tasks/hero_of_tatooine/hero_of_tat_mother_conv.lua")
 includeFile("conversations/tasks/hero_of_tatooine/hero_of_tat_pirate_leader_conv.lua")
 includeFile("conversations/tasks/hero_of_tatooine/hero_of_tat_ranchers_wife_conv.lua")
+
+-- Darndroid Quests
+includeFile("conversations/tasks/darndroid/amarent_loren_conv.lua")
+includeFile("conversations/tasks/darndroid/c3tc_conv.lua")
+includeFile("conversations/tasks/darndroid/selan_ellison_conv.lua")
+includeFile("conversations/tasks/darndroid/valance_serth_conv.lua")
+
+-- Safety Measures
+includeFile("conversations/tasks/safety_measures/gerak_vurtimis_conv.lua")
 
 -- Events
 includeFile("conversations/events/event_promoter_conv.lua")
@@ -103,6 +128,18 @@ includeFile("conversations/themepark/epic_quests/goru_conv.lua")
 -- Themepark Logic Convos
 includeFile("conversations/themepark/logic/mission_giver_conv.lua")
 includeFile("conversations/themepark/logic/mission_target_conv.lua")
+
+-- Enough Quest
+includeFile("conversations/tasks/enough/acun_solari_conv.lua")
+includeFile("conversations/tasks/enough/ceth_laike_conv.lua")
+
+-- Defector Quests
+includeFile("conversations/tasks/defector_quests/jom_irimore_conv.lua")
+includeFile("conversations/tasks/defector_quests/imperial_defector_conv.lua")
+includeFile("conversations/tasks/defector_quests/teslo_tendoora_conv.lua")
+includeFile("conversations/tasks/defector_quests/jaek_vercet_conv.lua")
+includeFile("conversations/tasks/defector_quests/rebel_defector_conv.lua")
+includeFile("conversations/tasks/defector_quests/allard_lissara_conv.lua")
 
 -- ** DUNGEONS **
 
@@ -265,7 +302,7 @@ includeFile("conversations/racetracks/lokconversation.lua")
 includeFile("conversations/racetracks/nashalconversation.lua")
 
 -- Space
-includeFile("conversations/space/chassis_dealer_conv.lua")
+includeFile("conversations/space/space_conversations.lua")
 
 -- Record Keepers
 includeFile("conversations/record_keepers/planet_record_keeper_dantooine_conv.lua")
@@ -278,6 +315,7 @@ includeFile("conversations/record_keepers/record_keeper_rebel_conv.lua")
 includeFile("conversations/pet/pets_conv.lua")
 
 -- Misc
+includeFile("conversations/misc/bartender_conv.lua")
 includeFile("conversations/misc/philosopher_conv.lua")
 
 -- Junk Dealers

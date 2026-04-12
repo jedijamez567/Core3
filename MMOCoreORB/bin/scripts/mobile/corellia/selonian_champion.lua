@@ -28,27 +28,11 @@ selonian_champion = Creature:new {
 	optionsBitmask = AIENABLED,
 	diet = HERBIVORE,
 
-	templates = {
-		"object/mobile/dressed_selonian_m_01.iff",
-		"object/mobile/dressed_selonian_m_02.iff",
-		"object/mobile/dressed_selonian_m_03.iff",
-		"object/mobile/dressed_selonian_m_04.iff",
-		"object/mobile/dressed_selonian_m_05.iff",
-		"object/mobile/dressed_selonian_m_06.iff",
-		"object/mobile/dressed_selonian_m_07.iff",
-		"object/mobile/dressed_selonian_m_08.iff",
-		"object/mobile/dressed_selonian_m_09.iff",
-		"object/mobile/dressed_selonian_m_10.iff",
-		"object/mobile/dressed_selonian_m_11.iff",
-		"object/mobile/dressed_selonian_m_12.iff"},
+	templates = {"selonian_male"},
 	lootGroups = {
 		{
 			groups = {
-				{group = "junk", chance = 3000000},
-				{group = "wearables_common", chance = 2000000},
-				{group = "rifles", chance = 1000000},
-				{group = "loot_kit_parts", chance = 2500000},
-				{group = "tailor_components", chance = 1500000}
+				{group = "selonian_tier_1", chance = 10000000}
 			}
 		}
 	},

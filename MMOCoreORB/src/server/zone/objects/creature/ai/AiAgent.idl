@@ -11,12 +11,12 @@ import system.lang.Exception;
 import server.zone.Zone;
 import server.zone.objects.creature.CreatureObject;
 import server.zone.objects.creature.commands.QueueCommand;
-import server.zone.objects.creature.ai.events.AiThinkEvent;
-import server.zone.objects.creature.ai.events.AiMoveEvent;
+import server.zone.objects.creature.ai.events.AiRecoveryEvent;
+import server.zone.objects.creature.ai.events.AiBehaviorEvent;
 import system.lang.ref.Reference;
 import server.zone.packets.scene.AttributeListMessage;
 import server.zone.objects.tangible.weapon.WeaponObject;
-import server.zone.QuadTreeEntry;
+import server.zone.TreeEntry;
 include server.zone.objects.creature.ai.PatrolPointsVector;
 include server.zone.objects.creature.ai.PatrolPoint;
 import engine.core.ManagedObject;
@@ -44,13 +44,14 @@ include engine.util.u3d.Vector3;
 import server.zone.objects.creature.ai.bt.BlackboardData;
 include server.zone.objects.creature.ai.bt.BlackboardDataMap;
 include server.zone.objects.area.ActiveArea;
+import server.zone.managers.creature.observers.CreatureHerdObserver;
 
 @mock
 @json
 class AiAgent extends CreatureObject {
-	protected transient AiThinkEvent thinkEvent;
+	protected transient AiRecoveryEvent recoveryEvent;
 
-	protected transient AiMoveEvent moveEvent;
+	protected transient AiBehaviorEvent behaviorEvent;
 
 	@dereferenced
 	protected transient ReadWriteLock despawnMutex;
@@ -59,28 +60,34 @@ class AiAgent extends CreatureObject {
 	protected Vector<string> skillCommands;
 
 	@dereferenced
-	protected PatrolPointsVector patrolPoints;
+	protected transient PatrolPointsVector patrolPoints;
 
 	@dereferenced
-	protected PatrolPointsVector savedPatrolPoints;
+	protected transient PatrolPointsVector savedPatrolPoints;
 
 	@dereferenced
-	protected PatrolPoint homeLocation;
+	protected transient PatrolPoint homeLocation;
 
 	@dereferenced
-	protected PatrolPoint nextStepPosition;
+	protected transient PatrolPoint nextStepPosition;
 
 	@dereferenced
-	protected PatrolPoint endMovementPosition;
+	protected transient PatrolPoint endMovementPosition;
 
 	protected transient CurrentFoundPath currentFoundPath;
 	protected transient CellObject targetCellObject;
+
+	protected float weaponSpeed;
+	protected int minDamage;
+	protected int maxDamage;
+
+	protected unsigned int primaryWeaponCrc;
+	protected unsigned int secondaryWeaponCrc;
 
 	protected WeaponObject defaultWeapon;
 	protected WeaponObject primaryWeapon;
 	protected WeaponObject secondaryWeapon;
 	protected WeaponObject thrownWeapon;
-
 	protected WeaponObject currentWeapon;
 
 	protected transient CreatureAttackMap primaryAttackMap;
@@ -101,8 +108,9 @@ class AiAgent extends CreatureObject {
 	@weakReference
 	protected ActiveArea eventArea;
 
-	//DEBUG
-	protected boolean showNextMovementPosition;
+	@weakReference
+	protected transient CreatureHerdObserver herdObserver;
+
 	@dereferenced
 	protected Vector<SceneObject> movementMarkers;
 
@@ -110,14 +118,22 @@ class AiAgent extends CreatureObject {
 
 	@weakReference
 	private SceneObject followObject;
+
 	@weakReference
 	private SceneObject followStore;
+
 	private unsigned int movementState;
+
 	@dereferenced
 	private transient Mutex targetMutex;
+
 	@dereferenced
-	private transient Mutex movementEventMutex;
-	private int nextMovementInterval;
+	private transient Mutex behaviorEventMutex;
+
+	private int nextBehaviorInterval;
+
+	@dereferenced
+	private transient Mutex recoveryEventMutex;
 
 	@dereferenced
 	protected transient Time lastDamageReceived;
@@ -145,6 +161,10 @@ class AiAgent extends CreatureObject {
 	protected float respawnTimer;
 	protected int respawnCounter;
 	protected boolean randomRespawn;
+
+	protected transient boolean hamRegenDisabled;
+
+	protected transient boolean patrolArrived;
 
 	protected float coordinateMin;
 	protected float coordinateMax;
@@ -192,7 +212,9 @@ class AiAgent extends CreatureObject {
 
 	protected transient boolean mindTricked;
 
-	public static final int UPDATEMOVEMENTINTERVAL = 400; // msec
+	public static final int BEHAVIORINTERVALMIN = 400; // msec
+	public static final int BEHAVIORINTERVALMID = 700; // msec
+	public static final int BEHAVIORINTERVALMAX = 1000; // msec
 
 	public static final int DEFAULTAGGRORADIUS = 24;
 
@@ -211,6 +233,8 @@ class AiAgent extends CreatureObject {
 	public static final int CRACKDOWN_SCANNING = 12;
 	public static final int HARVESTING = 13;
 	public static final int RESTING = 14;
+	public static final int CONVERSING = 15;
+	public static final int LAIR_HEALING = 16;
 
 	public static final int MOB_HERBIVORE = 1;
 	public static final int MOB_CARNIVORE = 2;
@@ -219,7 +243,13 @@ class AiAgent extends CreatureObject {
 	public static final int MOB_ANDROID = 5;
 	public static final int MOB_VEHICLE = 6;
 
+	public static final int MAX_OOS_COUNT = 30;
+	public static final int MAX_OOS_PERCENT = 40;
+	public static final float MAX_OOS_RANGE = 75.0f;
+
 	protected transient unsigned long customAiMap;
+
+	protected transient int outOfSightCounter;
 
 	public AiAgent() {
 		movementState = OBLIVIOUS;
@@ -228,19 +258,24 @@ class AiAgent extends CreatureObject {
 		respawnCounter = 0;
 		randomRespawn = false;
 
-		nextMovementInterval = UPDATEMOVEMENTINTERVAL;
+		primaryWeaponCrc = 0;
+		secondaryWeaponCrc = 0;
+
+		weaponSpeed = 2.0;
+		minDamage = 0;
+		maxDamage = 0;
+
+		nextBehaviorInterval = BEHAVIORINTERVALMID;
 
 		reactionRank = 0;
 
-		customAiMap = 0;
-
 		convoTemplateCRC = 0;
-
-		showNextMovementPosition = true;
 
 		despawnOnNoPlayerInRange = false;
 
 		tauntable = true;
+		hamRegenDisabled = false;
+		patrolArrived = false;
 
 		loadedOutfit = false;
 
@@ -254,6 +289,7 @@ class AiAgent extends CreatureObject {
 
 		coordinateMin = -8192;
 		coordinateMax = 8192;
+		outOfSightCounter = 0;
 	}
 
 	/**
@@ -263,6 +299,10 @@ class AiAgent extends CreatureObject {
 	 */
 	public native void initializeTransientMembers();
 
+	public void finalize() {
+		//Logger.info("deleting from ram", true);
+	}
+
 	/**
 	 * Gets called when this objects is loaded from database
 	 * @pre { this locked }
@@ -270,18 +310,33 @@ class AiAgent extends CreatureObject {
 	 */
 	public native void notifyLoadFromDatabase();
 
-	public void finalize() {
-		//Logger.info("deleting from ram", true);
-	}
+	/**
+	 * Reads and sets the template data from a SharedTangibleObjectTemplate LuaObject
+	 * @pre { templateData is a valid pointer }
+	 * @post { TangibleObject members are initialized }
+	 * @param templateData templateData points to the SharedTangibleObjectTemplate LuaObject that is used to initialize the TangibleObject members
+	 */
+	@local
+	public native void loadTemplateData(SharedObjectTemplate templateData);
+
+	@local
+	public native void loadTemplateData(CreatureTemplate templateData);
+
+	/**
+	 * Reset the aiagent back to it's initial creation state.
+	 * this resets the HAM, Damage, Size and Weapons of the AiAgent. Used for Pet adjustments.
+	 */
+	@preLocked
+	public native void reloadTemplate();
 
 	@read
 	public string getLogFileName() {
-	    return Logger.getLogFileName();
+		return Logger.getLogFileName();
 	}
 
 	@read
 	public int getLogLevel() {
-	    return Logger.getLogLevel();
+		return Logger.getLogLevel();
 	}
 
 	/**
@@ -298,7 +353,7 @@ class AiAgent extends CreatureObject {
 	 * @post { this is locked }
 	 */
 	@preLocked
-	public abstract native void activateMovementEvent(boolean reschedule = false);
+	public abstract native void activateAiBehavior(boolean reschedule = false);
 
 	/**
 	 * Stops the movement event task
@@ -306,7 +361,15 @@ class AiAgent extends CreatureObject {
 	 * @post { this is locked }
 	 */
 	@preLocked
-	public abstract native void cancelMovementEvent();
+	public abstract native void cancelBehaviorEvent();
+
+	/**
+	 * Stops the think event task
+	 * @pre { this is locked }
+	 * @post { this is locked }
+	 */
+	@preLocked
+	public abstract native void cancelRecoveryEvent();
 
 	/**
 	 * Does a recovery tick
@@ -323,7 +386,7 @@ class AiAgent extends CreatureObject {
 	 * @post { this object is locked, this AI will have performed one update tick }
 	 */
 	@preLocked
-	public native void doMovement();
+	public native void runBehaviorTree();
 
 	@local
 	@preLocked
@@ -354,6 +417,9 @@ class AiAgent extends CreatureObject {
 	public native void setAIDebug(boolean flag);
 
 	public native boolean getAIDebug();
+
+	@preLocked
+	public native void setWeaponStats();
 
 	@preLocked
 	public native void setLevel(int lvl, boolean randomHam = true);
@@ -434,7 +500,7 @@ class AiAgent extends CreatureObject {
 	public native void setNextStepPosition(float x, float z, float y, CellObject cell = null);
 
 	@dirty
-	public native void notifyPositionUpdate(QuadTreeEntry entry);
+	public native void notifyPositionUpdate(TreeEntry entry);
 
 	@local
 	@preLocked
@@ -450,13 +516,24 @@ class AiAgent extends CreatureObject {
 
 	public void clearPatrolPoints() {
 		synchronized (targetMutex) {
-			if (movementState == PATROLLING || movementState == WATCHING) {
-				for (int i = 0; i < patrolPoints.size(); i++) {
+			int patrolPointsSize = patrolPoints.size();
+
+			if (patrolPointsSize > 0 && (movementState == PATROLLING || movementState == WATCHING)) {
+				if (savedPatrolPoints.size() > 5)
+					savedPatrolPoints.removeAll();
+
+				for (int i = 0; i < patrolPointsSize; i++) {
 					savedPatrolPoints.add(patrolPoints.get(i));
 				}
 			}
 
 			patrolPoints.removeAll();
+		}
+	}
+
+	public void clearCurrentPath() {
+		synchronized (targetMutex) {
+			currentFoundPath = null;
 		}
 	}
 
@@ -486,31 +563,31 @@ class AiAgent extends CreatureObject {
 	}
 
 	@local
-	public native void notifyInsert(QuadTreeEntry entry);
+	public native void notifyInsert(TreeEntry entry);
 
 	@local
-	public native void notifyDissapear(QuadTreeEntry entry);
+	public native void notifyDissapear(TreeEntry entry);
 
-	/**
-	 * Reads and sets the template data from a SharedTangibleObjectTemplate LuaObject
-	 * @pre { templateData is a valid pointer }
-	 * @post { TangibleObject members are initialized }
-	 * @param templateData templateData points to the SharedTangibleObjectTemplate LuaObject that is used to initialize the TangibleObject members
-	 */
-	@local
-	public native void loadTemplateData(SharedObjectTemplate templateData);
+	/*
 
-	@local
-	public native void loadTemplateData(CreatureTemplate templateData);
+		Agent Weapon Handling
 
-	@local
-	public native void loadWeaponTemplateData();
-
-	@local
-	public native void setupAttackMaps();
+	*/
 
 	@local
 	public native WeaponObject createWeapon(unsigned int weaponCRC, boolean primaryWeapon);
+
+	@local
+	public native void setupCombatStats();
+
+	@preLocked
+	public native void createDefaultWeapon();
+
+	@local
+	public native void createWeaponsFromTemplate();
+
+	@local
+	public native void setupAttackMaps();
 
 	@local
 	public native void unequipWeapons();
@@ -520,6 +597,9 @@ class AiAgent extends CreatureObject {
 
 	@local
 	public native void equipSecondaryWeapon();
+
+	@preLocked
+	public native void destroyAllWeapons();
 
 	/**
 	 * Inflicts damage into the object
@@ -554,6 +634,15 @@ class AiAgent extends CreatureObject {
 	 */
 	@dirty
 	public native boolean sendConversationStartTo(SceneObject player);
+
+	/**
+	 * sends the conversation notification
+	 * @pre {this locked}
+	 * @post {this locked}
+	 */
+	@dirty
+	@preLocked
+	public native boolean stopConversation();
 
 	/**
 	 * sends the default conversation list
@@ -596,9 +685,8 @@ class AiAgent extends CreatureObject {
 
 		numberOfPlayersInRange.set(0);
 
-		if (moveEvent) {
-			moveEvent.clearCreatureObject();
-			moveEvent = null;
+		if (behaviorEvent) {
+			cancelBehaviorEvent();
 		}
 	}
 
@@ -664,7 +752,11 @@ class AiAgent extends CreatureObject {
 
 	public native boolean stalkProspect(SceneObject prospect);
 
-	public native void healTarget(CreatureObject target);
+	@arg1preLocked
+	public native void healCreatureTarget(CreatureObject healTarget);
+
+	@arg1preLocked
+	public native void healTangibleTarget(TangibleObject healTarget);
 
 	@preLocked
 	public native void setDespawnOnNoPlayerInRange(boolean val);
@@ -675,17 +767,12 @@ class AiAgent extends CreatureObject {
 	@preLocked
 	public abstract native void notifyDespawn(Zone zone);
 
-	public abstract void scheduleDespawn() {
-		//Despawn in 5 minutes.
-		scheduleDespawn(300);
-	}
-
 	/**
 	 * Schedules despawn of the AiAgent.
 	 * @param timeToDespawn the time to despawn the AiAgent in seconds.
 	 */
 	@preLocked
-	public abstract native void scheduleDespawn(int timeToDespawn);
+	public abstract native void scheduleDespawn(int timeToDespawn, boolean force = false);
 
 	/**
 	 * Respawns creature to specified zone with home location position
@@ -694,11 +781,7 @@ class AiAgent extends CreatureObject {
 	public native void respawn(Zone zone, int level);
 
 	@local
-	public void addPatrolPoint(@dereferenced PatrolPoint point) {
-		synchronized (targetMutex) {
-			patrolPoints.add(point);
-		}
-	}
+	public native void addPatrolPoint(@dereferenced PatrolPoint point);
 
 	@preLocked
 	public void setHomeLocation(float x, float z, float y, CellObject cell = null, float direction = 0) {
@@ -733,8 +816,9 @@ class AiAgent extends CreatureObject {
 	 */
 	@dirty
 	public native boolean isAttackableBy(CreatureObject object);
+
 	@dirty
-	public native boolean isAttackableBy(TangibleObject object);
+	public native abstract boolean isAttackableBy(TangibleObject object);
 
 	/**
 	 * Evaluates if this creature is aggresive to the object
@@ -744,18 +828,26 @@ class AiAgent extends CreatureObject {
 	 */
 	@mock
 	@dirty
-	public abstract native boolean isAggressiveTo(CreatureObject object);
+	public abstract native boolean isAggressiveTo(TangibleObject object);
 
 	@mock
 	@dirty
-	public abstract native boolean isAggressive(CreatureObject object);
+	public abstract native boolean isAggressive(TangibleObject object);
+
+	@dirty
+	public abstract native boolean isHealableBy(CreatureObject object);
+
+	@read
+	public abstract native boolean hasEffectImmunity(byte effectType);
+
+	@read
+	public abstract native boolean hasDotImmunity(unsigned int dotType);
 
 	public void setOblivious() {
 		synchronized (targetMutex) {
 			setMovementState(OBLIVIOUS);
 			setTargetObject(null);
 			clearState(CreatureState.PEACE);
-			//activateMovementEvent();
 		}
 	}
 
@@ -767,7 +859,6 @@ class AiAgent extends CreatureObject {
 			setMovementState(WATCHING);
 
 			setTargetObject(obj);
-			//activateMovementEvent();
 		}
 	}
 
@@ -779,7 +870,6 @@ class AiAgent extends CreatureObject {
 			setMovementState(STALKING);
 
 			setTargetObject(obj);
-			//activateMovementEvent();
 		}
 	}
 
@@ -792,7 +882,6 @@ class AiAgent extends CreatureObject {
 				setMovementState(FOLLOWING);
 
 				setTargetObject(obj);
-				//activateMovementEvent();
 			}
 		}
 	}
@@ -808,11 +897,10 @@ class AiAgent extends CreatureObject {
 	}
 
 	@preLocked
-	public native void runAway(CreatureObject target, float range, boolean random);
+	public native void runAway(CreatureObject target, float range, boolean random = false, boolean setTarget = true);
 
-	@mock
 	@preLocked
-	public abstract native void leash();
+	public abstract native void leash(boolean forcePeace = true);
 
 	@mock
 	public abstract native boolean generatePatrol(int num, float dist);
@@ -835,19 +923,8 @@ class AiAgent extends CreatureObject {
 		return movementState;
 	}
 
-	public void setMovementState(int state) {
-		synchronized (targetMutex) {
-			int oldState = movementState;
-
-			if (state != PATROLLING && state != WATCHING)
-				clearPatrolPoints();
-
-			movementState = state;
-
-			if (oldState == LEASHING || state == LEASHING)
-				broadcastPvpStatusBitmask();
-		}
-	}
+	@preLocked
+	public native void setMovementState(int state);
 
 	@dirty
 	@mock
@@ -861,7 +938,7 @@ class AiAgent extends CreatureObject {
 	 * will overwrite the current wait timer
 	 **/
 	@preLocked
-	public native void setWait(int wait);
+	public native void setWait(unsigned long wait);
 
 	/**
 	 * Sets the wait timer to current time and removes
@@ -871,9 +948,8 @@ class AiAgent extends CreatureObject {
 	public native void stopWaiting();
 
 	/**
-	 * Sees if our wait time is up (won't work for indefinite waits?)
+	 * Sees if our wait time is up
 	 **/
-	@read
 	public native boolean isWaiting();
 
 	@mock
@@ -897,7 +973,7 @@ class AiAgent extends CreatureObject {
 	public abstract native boolean validateStateAttack();
 
 	@preLocked
-	public native int enqueueAttack(int priority = -1);
+	public native int enqueueAttack(int priority = 2);
 
 	@mock
 	@dirty
@@ -1208,6 +1284,12 @@ class AiAgent extends CreatureObject {
 	}
 
 	@local
+	@dirty
+	public final CreatureAttackMap getPrimaryAttackMap() {
+		return primaryAttackMap;
+	}
+
+	@local
 	@read
 	public final LootGroupCollection getLootGroups() {
 		if (npcTemplate.get() == null || isEventMob())
@@ -1265,11 +1347,6 @@ class AiAgent extends CreatureObject {
 	@dirty
 	public native boolean hasLoot();
 
-	@preLocked
-	public void setShowNextPosition(boolean val) {
-		showNextMovementPosition = val;
-	}
-
 	@read
 	public native boolean isEventMob();
 
@@ -1300,6 +1377,18 @@ class AiAgent extends CreatureObject {
 		return eventArea;
 	}
 
+	@preLocked
+	public void setHerdObserver(CreatureHerdObserver observer) {
+		herdObserver = observer;
+	}
+
+	@read
+	@local
+	@weakReference
+	public CreatureHerdObserver getHerdObserver() {
+		return herdObserver;
+	}
+
 	/**
 	 * Sets the combat state
 	 * @pre { this object is locked }
@@ -1319,15 +1408,16 @@ class AiAgent extends CreatureObject {
 	}
 
 	@preLocked
-	public native void setCreatureBit(unsigned int option);
-	@preLocked
-	public native void clearCreatureBit(unsigned int option);
+	public native void addObjectFlag(unsigned int flag);
 
 	@preLocked
-	public native void addCreatureFlag(unsigned int flag);
+	public native void removeObjectFlag(unsigned int flag);
 
-	@preLocked
-	public native void removeCreatureFlag(unsigned int flag);
+	@read
+	public native boolean isScoutCreature();
+
+	@read
+	public native boolean isHerdCreature();
 
 	@local
 	@dirty
@@ -1379,6 +1469,9 @@ class AiAgent extends CreatureObject {
 
 	@dirty
 	public native boolean hasRangedWeapon();
+
+	@dirty
+	public native boolean hasMeleeWeapon();
 
 	@dirty
 	public native boolean getUseRanged();
@@ -1438,13 +1531,6 @@ class AiAgent extends CreatureObject {
 
 	@preLocked
 	public native void setMaxHAM(int type, int value, boolean notifyClient = true);
-
-	/**
-	 * Reset the aiagent back to it's initial creation state.
-	 * this resets the HAM, Damage, Size and Weapons of the AiAgent. Used for Pet adjustments.
-	 */
-	@preLocked
-	public native void reloadTemplate();
 
 	@read
 	public unsigned int getConvoTemplateCRC() {
@@ -1508,6 +1594,21 @@ class AiAgent extends CreatureObject {
 		defaultWeapon = weap;
 	}
 
+	@preLocked
+	public void setPrimaryWeapon(WeaponObject weap) {
+		primaryWeapon = weap;
+	}
+
+	@preLocked
+	public void setSecondaryWeapon(WeaponObject weap) {
+		secondaryWeapon = weap;
+	}
+
+	@preLocked
+	public void setThrownWeapon(WeaponObject weap) {
+		thrownWeapon = weap;
+	}
+
 	@dirty
 	public abstract WeaponObject getPrimaryWeapon() {
 		return primaryWeapon;
@@ -1528,21 +1629,36 @@ class AiAgent extends CreatureObject {
 		return thrownWeapon;
 	}
 
+	@dirty
+	public native WeaponObject getCurrentWeapon() {
+		return currentWeapon;
+	}
+
 	@preLocked
 	public void clearThrownWeapon() {
 		thrownWeapon = null;
 	}
 
-	@dirty
-	public abstract WeaponObject getCurrentWeapon() {
-		return defaultWeapon;
-	}
-
-	public void nullifyWeapons () {
+	public void nullifyWeapons() {
+		currentWeapon = null;
 		primaryWeapon = null;
 		secondaryWeapon = null;
 		thrownWeapon = null;
-		currentWeapon = null;
+	}
+
+	@read
+	public float getWeaponSpeed() {
+		return weaponSpeed;
+	}
+
+	@read
+	public int getMinDamage() {
+		return minDamage;
+	}
+
+	@read
+	public int getMaxDaamge() {
+		return maxDamage;
 	}
 
 	@read
@@ -1636,5 +1752,46 @@ class AiAgent extends CreatureObject {
 	@read
 	public boolean isMindTricked() {
 		return mindTricked;
+	}
+
+	@read
+	public boolean isHamRegenDisabled() {
+		return hamRegenDisabled;
+	}
+
+	@preLocked
+	public void setHamRegenDisabled(boolean val) {
+		hamRegenDisabled = val;
+	}
+
+	@read
+	public boolean isAggroDelayPast() {
+		return aggroDelay.isPast();
+	}
+
+	@read
+	public boolean getPatrolArrived() {
+		/*
+		if (patrolArrived) {
+			Logger.info(true) << "getPatrolArrived -- returning TRUE";
+		} else {
+			Logger.info(true) << "getPatrolArrived -- returning FALSE";
+		}
+		*/
+
+		return patrolArrived;
+	}
+
+	@preLocked
+	public void setPatrolArrived(boolean val) {
+		/*
+		if (val) {
+			Logger.info(true) << "setPatrolArrived -- TRUE";
+		} else {
+			Logger.info(true) << "setPatrolArrived -- FALSE";
+		}
+		*/
+
+		patrolArrived = val;
 	}
 }

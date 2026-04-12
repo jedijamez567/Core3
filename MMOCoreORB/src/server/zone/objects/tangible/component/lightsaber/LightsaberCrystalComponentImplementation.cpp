@@ -277,6 +277,10 @@ float LightsaberCrystalComponentImplementation::getRandomizedStat(float min, flo
 void LightsaberCrystalComponentImplementation::fillAttributeList(AttributeListMessage* alm, CreatureObject* object) {
 	TangibleObjectImplementation::fillAttributeList(alm, object);
 
+	if (object == nullptr) {
+		return;
+	}
+
 	PlayerObject* player = object->getPlayerObject();
 	if (object->hasSkill("force_title_jedi_rank_01") || player->isPrivileged()) {
 		if (ownerID == 0) {
@@ -455,6 +459,11 @@ void LightsaberCrystalComponentImplementation::updateCraftingValues(CraftingValu
 	} else {
 		setColor(31);
 		updateCrystal(31);
+	}
+
+	if (values->hasExperimentalAttribute("creatureLevel")) {
+		int level = values->getCurrentValue("creatureLevel");
+		setItemLevel(level);
 	}
 
 	generateCrystalStats();

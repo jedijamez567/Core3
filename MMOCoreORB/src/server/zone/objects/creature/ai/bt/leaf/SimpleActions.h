@@ -6,6 +6,7 @@
 #include "server/zone/objects/creature/ai/AiAgent.h"
 #include "server/zone/managers/gcw/GCWManager.h"
 #include "server/zone/managers/reaction/ReactionManager.h"
+#include "server/zone/managers/creature/observers/CreatureHerdObserver.h"
 
 namespace server {
 namespace zone {
@@ -95,7 +96,10 @@ public:
 	}
 
 	Behavior::Status execute(AiAgent* agent, unsigned int startIdx = 0) const {
-		agent->clearQueueActions();
+		if (!agent->isInCombat())
+			return FAILURE;
+
+		agent->clearQueueActions(true);
 		agent->clearCombatState(clearDefenders);
 
 		return !agent->isInCombat() ? SUCCESS : FAILURE;
@@ -128,10 +132,11 @@ public:
 
 		uint32 weapon = agent->readBlackboard("stagedWeapon").get<uint32>();
 
-		if (weapon == DataVal::PRIMARYWEAPON)
+		if (weapon == DataVal::PRIMARYWEAPON) {
 			agent->equipPrimaryWeapon();
-		else if (weapon == DataVal::SECONDARYWEAPON)
+		} else if (weapon == DataVal::SECONDARYWEAPON) {
 			agent->equipSecondaryWeapon();
+		}
 
 		return SUCCESS;
 	}
@@ -246,7 +251,11 @@ public:
 	Behavior::Status execute(AiAgent* agent, unsigned int startIdx = 0) const {
 		//agent->info("SelectAttack::execute", true);
 
-		WeaponObject* weapon = agent->getWeapon();
+		if (agent->isDead()) {
+			return FAILURE;
+		}
+
+		WeaponObject* weapon = agent->getCurrentWeapon();
 
 		if (weapon != nullptr && weapon->getAttackType() ==  SharedWeaponObjectTemplate::FORCEATTACK) {
 			return agent->selectSpecialAttack(-1) ? SUCCESS : FAILURE;
@@ -303,7 +312,8 @@ public:
 	}
 
 	Behavior::Status execute(AiAgent* agent, unsigned int startIdx = 0) const {
-		int res = agent->enqueueAttack(-1);
+		// Using Normal (2) Priority
+		int res = agent->enqueueAttack(2);
 		Behavior::Status returnRes = FAILURE;
 
 		if (!res)
@@ -323,18 +333,23 @@ public:
 
 class FindNextPosition : public Behavior {
 public:
-	FindNextPosition(const String& className, const uint32 id, const LuaObject& args)
-			: Behavior(className, id, args) {
+	FindNextPosition(const String& className, const uint32 id, const LuaObject& args) : Behavior(className, id, args) {
 	}
 
-	FindNextPosition(const FindNextPosition& a)
-			: Behavior(a) {
+	FindNextPosition(const FindNextPosition& a) : Behavior(a) {
 	}
 
 	Behavior::Status execute(AiAgent* agent, unsigned int startIdx = 0) const {
 		DataVal mode = DataVal::WALK;
+
 		if (agent->peekBlackboard("moveMode"))
 			mode = static_cast<DataVal>(agent->readBlackboard("moveMode").get<uint32>());
+
+		uint32 movementState = agent->getMovementState();
+
+		if (movementState == AiAgent::FOLLOWING) {
+			return agent->findNextPosition(agent->getMaxDistance(), mode == DataVal::WALK) ? SUCCESS : FAILURE;
+		}
 
 		return agent->findNextPosition(agent->getMaxDistance(), mode == DataVal::WALK) ? RUNNING : SUCCESS;
 	}
@@ -358,54 +373,57 @@ public:
 
 class Wait : public Behavior {
 public:
-	Wait(const String& className, const uint32 id, const LuaObject& args)
-			: Behavior(className, id, args), duration(-1) {
+	Wait(const String& className, const uint32 id, const LuaObject& args) : Behavior(className, id, args), durationMin(-1), durationMax(-1) {
 		parseArgs(args);
 	}
 
-	Wait(const Wait& a)
-			: Behavior(a), duration(a.duration) {
+	Wait(const Wait& a) : Behavior(a), durationMin(a.durationMin), durationMax(a.durationMax) {
 	}
 
 	Wait& operator=(const Wait& a) {
 		if (this == &a)
 			return *this;
+
 		Behavior::operator=(a);
-		duration = a.duration;
+
+		durationMin = a.durationMin;
+		durationMax = a.durationMax;
+
 		return *this;
 	}
 
 	void parseArgs(const LuaObject& args) {
-		duration = (int) (getArg<float>()(args, "duration") * 1000);
+		durationMin = (int)(getArg<float>()(args, "durationMin") * 1000);
+		durationMax = (int)(getArg<float>()(args, "durationMax") * 1000);
 	}
 
 	Behavior::Status execute(AiAgent* agent, unsigned int startIdx = 0) const {
 		// we don't need to check a value. Just checking to see if this value
 		// exists on the blackboard is fine since it can never be false
-		if (agent->peekBlackboard("isWaiting")) {
-			if (agent->isWaiting() || duration < 0) // < 0 means indefinite wait
-				return RUNNING;
-			else {
-				agent->eraseBlackboard("isWaiting");
-				return SUCCESS;
-			}
+		if (agent->isWaiting() || durationMin < 0) { // < 0 means indefinite wait
+			return RUNNING;
 		}
 
-		agent->setWait(duration);
+		uint64 totalWait = System::random(abs(durationMax - durationMin)) + durationMin;
+
+		// agent->info(true) << "setting wait: " << totalWait << " Num of players in range: " << agent->getNumberOfPlayersInRange();
+
+		agent->setWait(totalWait);
 		agent->writeBlackboard("isWaiting", true);
 
-		return RUNNING;
+		return SUCCESS;
 	}
 
 	String print() const {
 		StringBuffer msg;
-		msg << className << "-" << duration;
+		msg << className << "- durationMin: " << durationMin << " durationMax: " << durationMax;
 
 		return msg.toString();
 	}
 
 private:
-	int duration;
+	int durationMin;
+	int durationMax;
 };
 
 class SetAlert : public Behavior {
@@ -446,13 +464,18 @@ public:
 		if (agent->getPosture() != CreaturePosture::UPRIGHT)
 			agent->setPosture(CreaturePosture::UPRIGHT, true);
 
-		if (show) {
+		ManagedReference<SceneObject*> target = nullptr;
+
+		if (agent->peekBlackboard("targetProspect"))
+			target = agent->readBlackboard("targetProspect").get<ManagedReference<SceneObject*> >().get();
+
+		if (show && target != nullptr && target->isPlayerCreature()) {
 			agent->showFlyText("npc_reaction/flytext", "alert", 255, 0, 0);
 
-			if (agent->isNpc() && agent->getFaction() > 0)
+			if (agent->isNpc() && agent->getFaction() > 0 && agent->isAggressiveTo(target->asCreatureObject()))
 				agent->doAnimation("search");
 
-			agent->sendReactionChat(nullptr, ReactionManager::ALERT);
+			agent->sendReactionChat(target, ReactionManager::ALERT);
 		}
 
 		return SUCCESS;
@@ -497,7 +520,7 @@ public:
 			return FAILURE;
 
 		if (System::random(100) > 98 && !agent->isDizzied()) {
-			WeaponObject* weapon = agent->getWeapon();
+			WeaponObject* weapon = agent->getCurrentWeapon();
 
 			if (weapon == nullptr || !weapon->isRangedWeapon())
 				return FAILURE;
@@ -558,7 +581,10 @@ public:
 		if (agent->peekBlackboard("targetProspect"))
 			target = agent->readBlackboard("targetProspect").get<ManagedReference<SceneObject*> >().get();
 
-		if (target == nullptr || !target->isPlayerCreature())
+		if (target == nullptr)
+			return FAILURE;
+
+		if (!agent->checkCooldownRecovery("crackdown_scan"))
 			return FAILURE;
 
 		Zone* zone = agent->getZone();
@@ -602,12 +628,16 @@ public:
 	}
 
 	Behavior::Status execute(AiAgent* agent, unsigned int startIdx = 0) const {
-		ManagedReference<CreatureObject*> healTarget = nullptr;
+		// agent->info(true) << "ID: " << agent->getObjectID() << "  SimpleAction - HealTarget called";
 
-		if (agent->peekBlackboard("healTarget"))
-			healTarget = agent->readBlackboard("healTarget").get<ManagedReference<CreatureObject*> >().get();
+		ManagedReference<TangibleObject*> healTarget = nullptr;
 
-		if (healTarget == nullptr || healTarget->isDead()) {
+		if (agent->peekBlackboard("healTarget")) {
+			healTarget = agent->readBlackboard("healTarget").get<ManagedReference<TangibleObject*> >().get();
+		}
+
+		// Check if heal target exists
+		if (healTarget == nullptr) {
 			agent->eraseBlackboard("healTarget");
 			agent->setMovementState(AiAgent::FOLLOWING);
 			return FAILURE;
@@ -621,20 +651,50 @@ public:
 			range = 32.f;
 		}
 
-		if (healTarget->getHAM(CreatureAttribute::HEALTH) < healTarget->getMaxHAM(CreatureAttribute::HEALTH) || healTarget->getHAM(CreatureAttribute::ACTION) < healTarget->getMaxHAM(CreatureAttribute::ACTION)) {
-			agent->clearQueueActions();
+		// Creature Object heal target
+		if (healTarget->isCreatureObject()) {
+			// agent->info(true) << "ID: " << agent->getObjectID() << " healTarget is a creature -- Target: " << healTarget->getDisplayedName();
 
-			if (healTarget == agent) {
-				agent->healTarget(healTarget);
-				healExecuted = true;
-			} else {
-				if (agent->isInRange(healTarget, range)) {
-					Locker clocker(healTarget, agent);
+			auto healTargetCreO = healTarget->asCreatureObject();
 
-					agent->healTarget(healTarget);
+			if (healTargetCreO == nullptr || healTargetCreO->isDead()) {
+				agent->eraseBlackboard("healTarget");
+				agent->setMovementState(AiAgent::FOLLOWING);
+
+				return FAILURE;
+			}
+
+			if (healTargetCreO->getHAM(CreatureAttribute::HEALTH) < healTargetCreO->getMaxHAM(CreatureAttribute::HEALTH) || healTargetCreO->getHAM(CreatureAttribute::ACTION) < healTargetCreO->getMaxHAM(CreatureAttribute::ACTION)) {
+				agent->clearQueueActions(true);
+
+				if (healTargetCreO == agent) {
+					agent->healCreatureTarget(healTargetCreO);
+					healExecuted = true;
+				} else if (agent->isInRange(healTarget, range)) {
+					Locker clocker(healTargetCreO, agent);
+
+					agent->healCreatureTarget(healTargetCreO);
 
 					healExecuted = true;
 				}
+			}
+		// Tangible Object heal target (Lairs, etc)
+		} else {
+			// agent->info(true) << "ID: " << agent->getObjectID() << " healTarget is a Tangible Object -- Target: " << healTarget->getDisplayedName();
+
+			if (healTarget->getZone() == nullptr || healTarget->getConditionDamage() < 1) {
+				agent->eraseBlackboard("healTarget");
+				agent->setMovementState(AiAgent::FOLLOWING);
+
+				return FAILURE;
+			}
+
+			if (agent->isInRange(healTarget, 2.0f)) {
+				Locker clocker(healTarget, agent);
+
+				agent->healTangibleTarget(healTarget);
+
+				healExecuted = true;
 			}
 		}
 
@@ -701,7 +761,8 @@ public:
 		if (sqrDist > 35 * 35 || sqrDist < 25 * 25) // Between 35m and 25m
 			return FAILURE;
 
-		agent->faceObject(target, true);
+		if (!(agent->getCreatureBitmask() & ObjectFlag::STATIC))
+			agent->faceObject(target, true);
 
 		if (target->isFacingObject(agent))
 			agent->sendReactionChat(target, ReactionManager::HI);
@@ -940,6 +1001,88 @@ public:
 		agent->setMovementState(AiAgent::PATROLLING);
 
 		return SUCCESS;
+	}
+
+	String print() const {
+		StringBuffer msg;
+		msg << className;
+
+		return msg.toString();
+	}
+};
+
+class RestHerd : public Behavior {
+public:
+	RestHerd(const String& className, const uint32 id, const LuaObject& args) : Behavior(className, id, args) {
+	}
+
+	RestHerd(const RestHerd& a) : Behavior(a) {
+	}
+
+	RestHerd& operator=(const RestHerd& a) {
+		if (this == &a)
+			return *this;
+		Behavior::operator=(a);
+		return *this;
+	}
+
+	Behavior::Status execute(AiAgent* agent, unsigned int startIdx = 0) const {
+		if (agent == nullptr)
+			return FAILURE;
+
+		ManagedReference<CreatureHerdObserver*> herdObserver = agent->getHerdObserver();
+
+		if (herdObserver == nullptr)
+			return FAILURE;
+
+		// Set rest delay on the leader (calling agent)
+		Time* restDelay = agent->getRestDelay();
+
+		if (restDelay == nullptr)
+			return FAILURE;
+
+		// Wait 5 minutes until we check if we should rest again
+		int delay = 300 * 1000;
+
+		restDelay->updateToCurrentTime();
+		restDelay->addMiliTime(delay);
+
+		return herdObserver->restHerd() ? SUCCESS : FAILURE;
+	}
+
+	String print() const {
+		StringBuffer msg;
+		msg << className;
+
+		return msg.toString();
+	}
+};
+
+class StopHerdRest : public Behavior {
+public:
+	StopHerdRest(const String& className, const uint32 id, const LuaObject& args) : Behavior(className, id, args) {
+	}
+
+	StopHerdRest(const StopHerdRest& a) : Behavior(a) {
+	}
+
+	StopHerdRest& operator=(const StopHerdRest& a) {
+		if (this == &a)
+			return *this;
+		Behavior::operator=(a);
+		return *this;
+	}
+
+	Behavior::Status execute(AiAgent* agent, unsigned int startIdx = 0) const {
+		if (agent == nullptr)
+			return FAILURE;
+
+		ManagedReference<CreatureHerdObserver*> herdObserver = agent->getHerdObserver();
+
+		if (herdObserver == nullptr)
+			return FAILURE;
+
+		return herdObserver->stopHerdRest() ? SUCCESS : FAILURE;
 	}
 
 	String print() const {

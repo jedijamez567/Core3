@@ -150,8 +150,6 @@ void WeaponObjectImplementation::createChildObjects() {
 }
 
 void WeaponObjectImplementation::sendBaselinesTo(SceneObject* player) {
-	debug("sending weapon object baselines");
-
 	BaseMessage* weao3 = new WeaponObjectMessage3(_this.getReferenceUnsafeStaticCast());
 	player->sendMessage(weao3);
 
@@ -215,12 +213,14 @@ String WeaponObjectImplementation::getWeaponType() const {
 void WeaponObjectImplementation::fillAttributeList(AttributeListMessage* alm, CreatureObject* object) {
 	TangibleObjectImplementation::fillAttributeList(alm, object);
 
-	bool res = isCertifiedFor(object);
+	if (object != nullptr) {
+		bool res = isCertifiedFor(object);
 
-	if (res) {
-		alm->insertAttribute("weapon_cert_status", "Yes");
-	} else {
-		alm->insertAttribute("weapon_cert_status", "No");
+		if (res) {
+			alm->insertAttribute("weapon_cert_status", "Yes");
+		} else {
+			alm->insertAttribute("weapon_cert_status", "No");
+		}
 	}
 
 	/*if (usesRemaining > 0)
@@ -337,12 +337,15 @@ void WeaponObjectImplementation::fillAttributeList(AttributeListMessage* alm, Cr
 	maxrange << getMaxRangeAccuracy() << " @ " << getMaxRange() << "m";
 	alm->insertAttribute("cat_wpn_rangemods.wpn_range_max", maxrange);
 
-	//Special Attack Costs
-	alm->insertAttribute("cat_wpn_attack_cost.health", getHealthAttackCost());
+	// Show special attack cost for all weapons except mines
+	if (getGameObjectType() != SceneObjectType::MINE) {
+		//Special Attack Costs
+		alm->insertAttribute("cat_wpn_attack_cost.health", getHealthAttackCost());
 
-	alm->insertAttribute("cat_wpn_attack_cost.action", getActionAttackCost());
+		alm->insertAttribute("cat_wpn_attack_cost.action", getActionAttackCost());
 
-	alm->insertAttribute("cat_wpn_attack_cost.mind", getMindAttackCost());
+		alm->insertAttribute("cat_wpn_attack_cost.mind", getMindAttackCost());
+	}
 
 	//Anti Decay Kit
 	if(hasAntiDecayKit()){
@@ -624,7 +627,7 @@ void WeaponObjectImplementation::updateCraftingValues(CraftingValues* values, bo
 	}
 
 	value = values->getCurrentValue("woundchance");
-	if (value != ValuesMap::VALUENOTFOUND)
+	if (value != AttributesMap::VALUENOTFOUND)
 		setWoundsRatio(value);
 
 	//value = craftingValues->getCurrentValue("roundsused");
@@ -632,23 +635,23 @@ void WeaponObjectImplementation::updateCraftingValues(CraftingValues* values, bo
 		//_this.getReferenceUnsafeStaticCast()->set_______(value);
 
 	value = values->getCurrentValue("zerorangemod");
-	if (value != ValuesMap::VALUENOTFOUND)
+	if (value != AttributesMap::VALUENOTFOUND)
 		setPointBlankAccuracy((int)value);
 
 	value = values->getCurrentValue("maxrange");
-	if (value != ValuesMap::VALUENOTFOUND)
+	if (value != AttributesMap::VALUENOTFOUND)
 		setMaxRange((int)value);
 
 	value = values->getCurrentValue("maxrangemod");
-	if (value != ValuesMap::VALUENOTFOUND)
+	if (value != AttributesMap::VALUENOTFOUND)
 		setMaxRangeAccuracy((int)value);
 
 	value = values->getCurrentValue("midrange");
-	if (value != ValuesMap::VALUENOTFOUND)
+	if (value != AttributesMap::VALUENOTFOUND)
 		setIdealRange((int)value);
 
 	value = values->getCurrentValue("midrangemod");
-	if (value != ValuesMap::VALUENOTFOUND)
+	if (value != AttributesMap::VALUENOTFOUND)
 		setIdealAccuracy((int)value);
 
 	//value = craftingValues->getCurrentValue("charges");
@@ -656,7 +659,7 @@ void WeaponObjectImplementation::updateCraftingValues(CraftingValues* values, bo
 	//	setUsesRemaining((int)value);
 
 	value = values->getCurrentValue("hitpoints");
-	if (value != ValuesMap::VALUENOTFOUND)
+	if (value != AttributesMap::VALUENOTFOUND)
 		setMaxCondition((int)value);
 
 	setConditionDamage(0);
@@ -788,7 +791,7 @@ void WeaponObjectImplementation::applySkillModsTo(CreatureObject* creature) cons
 
 		if (!SkillModManager::instance()->isWearableModDisabled(name)) {
 			creature->addSkillMod(SkillModManager::WEARABLE, name, value, true);
-			creature->updateTerrainNegotiation();
+			creature->updateSpeedAndAccelerationMods();
 		}
 	}
 
@@ -806,7 +809,7 @@ void WeaponObjectImplementation::removeSkillModsFrom(CreatureObject* creature) {
 
 		if (!SkillModManager::instance()->isWearableModDisabled(name)) {
 			creature->removeSkillMod(SkillModManager::WEARABLE, name, value, true);
-			creature->updateTerrainNegotiation();
+			creature->updateSpeedAndAccelerationMods();
 		}
 	}
 

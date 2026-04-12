@@ -8,100 +8,344 @@
 #include "server/zone/objects/player/PlayerObject.h"
 #include "server/zone/packets/object/ObjectMenuResponse.h"
 #include "server/zone/Zone.h"
+#include "server/zone/SpaceZone.h"
 #include "server/zone/managers/player/PlayerManager.h"
+#include "server/zone/managers/collision/CollisionManager.h"
+#include "server/zone/objects/ship/ShipObject.h"
+#include "server/zone/objects/ship/PobShipObject.h"
+#include "server/zone/objects/intangible/tasks/LaunchShipTask.h"
+#include "server/zone/objects/intangible/tasks/StoreShipTask.h"
+#include "server/zone/managers/ship/ShipManager.h"
+#include "templates/params/creature/PlayerArrangement.h"
+#include "server/zone/managers/planet/PlanetManager.h"
+#include "server/zone/managers/stringid/StringIdManager.h"
 
-void ShipControlDeviceImplementation::generateObject(CreatureObject* player) {
-	//info("generating ship", true);
-	//return;
 
-	ZoneServer* zoneServer = getZoneServer();
+ShipObject* ShipControlDeviceImplementation::launchShip(CreatureObject* player, const String& zoneName, const Vector3& position) {
+	auto ship = controlledObject.get().castTo<ShipObject*>();
 
-	ManagedReference<TangibleObject*> controlledObject = this->controlledObject.get();
+	if (ship == nullptr) {
+		return nullptr;
+	}
 
-	Locker clocker(controlledObject, player);
+	auto zoneServer = getZoneServer();
 
-	controlledObject->initializePosition(player->getPositionX(), player->getPositionZ() + 10, player->getPositionY());
+	if (zoneServer ==  nullptr) {
+		return nullptr;
+	}
 
-	player->getZone()->transferObject(controlledObject, -1, true);
-	//controlledObject->insertToZone(player->getZone());
+	auto zone = zoneServer->getZone(zoneName);
 
-	//removeObject(controlledObject, true);
+	if (zone == nullptr) {
+		return nullptr;
+	}
 
-	controlledObject->transferObject(player, 5, true);
-	player->setState(CreatureState::PILOTINGSHIP);
-	//controlledObject->inflictDamage(player, 0, System::random(50), true);
+	Locker sLock(ship, _this.getReferenceUnsafeStaticCast());
 
-	updateStatus(1);
+	ship->initializePosition(position.getX(), position.getZ(), position.getY());
+	ship->setDirection(1,0,0,0);
+	ship->setMovementCounter(0);
 
-	PlayerObject* ghost = player->getPlayerObject();
+	ship->clearPlayersOnBoard();
 
-	if (ghost != nullptr)
-		ghost->setTeleporting(true);
-}
+	ship->resetEfficiency();
 
-void ShipControlDeviceImplementation::storeObject(CreatureObject* player, bool force) {
-	player->clearState(CreatureState::PILOTINGSHIP);
+	ship->resetShipFaction();
 
-	ManagedReference<TangibleObject*> controlledObject = this->controlledObject.get();
+	if (!zone->transferObject(ship, -1, true)) {
+		return nullptr;
+	}
 
-	if (controlledObject == nullptr)
-		return;
+	if (player->isInvulnerable()) {
+		ship->setOptionBit(OptionBitmask::INVULNERABLE, false);
+	} else {
+		ship->clearOptionBit(OptionBitmask::INVULNERABLE, false);
+	}
 
-	Locker clocker(controlledObject, player);
+	updateStatus(true, true);
 
-	if (!controlledObject->isInQuadTree())
-		return;
+	// ship->info(true) << ship->getDisplayedName() << " ship succesfully launched into space zone";
 
-	Zone* zone = player->getZone();
-
-	if (zone == nullptr)
-		return;
-
-	zone->transferObject(player, -1, false);
-	
-	controlledObject->destroyObjectFromWorld(true);
-
-	transferObject(controlledObject, 4, true);
-	
-	updateStatus(0);
+	return ship;
 }
 
 void ShipControlDeviceImplementation::fillObjectMenuResponse(ObjectMenuResponse* menuResponse, CreatureObject* player) {
-	//ControlDeviceImplementation::fillObjectMenuResponse(menuResponse, player);
+	if (player == nullptr)
+		return;
 
-	ManagedReference<TangibleObject*> controlledObject = this->controlledObject.get();
+	auto ship = controlledObject.get().castTo<ShipObject*>();
 
-	if (!controlledObject->isInQuadTree()) {
-		menuResponse->addRadialMenuItem(60, 3, "Launch Ship"); //Launch
-	} else
-		menuResponse->addRadialMenuItem(61, 3, "Land Ship"); //Launch
-	//menuResponse->addRadialMenuItem(61, 3, "Launch Ship"); //Launch
+	if (ship == nullptr) {
+		return;
+	}
+
+	// Name Ship
+	menuResponse->addRadialMenuItem(RadialOptions::SET_NAME, 3, "@sui:rename_ship"); // Rename Ship
+
+	// Deed Ship
+	menuResponse->addRadialMenuItem(RadialOptions::SERVER_DIVIDER, 3, "@sui:pack_ship"); // Deed Ship
+
+	auto root = player->getRootParent();
+
+	// Player is in another ship, no additional menu options given
+	if (root != nullptr && root->isShipObject() && root != ship) {
+		return;
+	}
+
+	auto zoneServer = ServerCore::getZoneServer();
+
+	if (zoneServer == nullptr) {
+		return;
+	}
+
+	// Launch and Land from datapad
+	auto ghost = player->getPlayerObject();
+
+	if (ghost == nullptr || !ghost->isPrivileged()) {
+		return;
+	}
+
+	if (isShipLaunched()) {
+		String zoneName = StringIdManager::instance()->getStringId("@planet_n:" + storedZoneName).toString();
+		menuResponse->addRadialMenuItem(RadialOptions::PET_STORE, 3, "Land Ship: " + parkingLocation + ", " + zoneName);
+	} else {
+		menuResponse->addRadialMenuItem(RadialOptions::SERVER_MENU1, 3, "Launch Ship");
+
+		for (int i = 0; i < zoneServer->getSpaceZoneCount(); ++i) {
+			auto zone = zoneServer->getSpaceZone(i);
+
+			if (zone == nullptr) {
+				continue;
+			}
+
+			menuResponse->addRadialMenuItemToRadialID(RadialOptions::SERVER_MENU1, 1 + RadialOptions::SERVER_MENU1 + i, 3, "@planet_n:" + zone->getZoneName());
+		}
+	}
+}
+
+int ShipControlDeviceImplementation::handleObjectMenuSelect(CreatureObject* player, byte selectedID) {
+	if (player == nullptr)
+		return 0;
+
+	auto ship = controlledObject.get().castTo<ShipObject*>();
+
+	if (ship == nullptr) {
+		return 1;
+	}
+
+	auto zoneServer = ServerCore::getZoneServer();
+
+	if (zoneServer == nullptr) {
+		return 1;
+	}
+
+	// Name Ship
+	if (selectedID == RadialOptions::SET_NAME) {
+		auto shipManager = ShipManager::instance();
+
+		if (shipManager == nullptr) {
+			return 1;
+		}
+
+		shipManager->promptNameShip(player, _this.getReferenceUnsafeStaticCast());
+	// Deed Ship
+	} else if (selectedID == RadialOptions::SERVER_DIVIDER) {
+		auto shipManager = ShipManager::instance();
+
+		if (shipManager == nullptr) {
+			return 1;
+		}
+
+		shipManager->reDeedShip(player, _this.getReferenceUnsafeStaticCast());
+	}
+
+	auto ghost = player->getPlayerObject();
+
+	if (ghost == nullptr || !ghost->isPrivileged()) {
+		return 1;
+	}
+
+	if (isShipLaunched()) {
+		if (selectedID == RadialOptions::PET_STORE) {
+			auto zone = zoneServer->getZone(storedZoneName);
+
+			if (zone == nullptr) {
+				return 1;
+			}
+
+			StoreShipTask* task = new StoreShipTask(player, _this.getReferenceUnsafeStaticCast(), storedZoneName, storedPosition);
+
+			if (task != nullptr) {
+				task->execute();
+			}
+
+			return isShipLaunched() ? 1 : 0;
+		}
+	} else if (selectedID > RadialOptions::SERVER_MENU1) {
+		int spaceZoneIndex = selectedID - RadialOptions::SERVER_MENU1 - 1;
+		int spaceZoneCount = zoneServer->getSpaceZoneCount();
+
+		auto zone = (spaceZoneIndex < spaceZoneCount) ? zoneServer->getSpaceZone(spaceZoneIndex) : nullptr;
+
+		if (zone == nullptr) {
+			return 1;
+		}
+
+		Vector<uint64> groupVector;
+		auto group = player->getGroup();
+
+		if (group != nullptr) {
+			Locker groupClock(group, player);
+
+			for (int i = 0; i < group->getGroupSize(); i++) {
+				auto member = group->getGroupMember(i);
+
+				if (member == nullptr || member == player || !member->isPlayerCreature()) {
+					continue;
+				}
+
+				groupVector.add(member->getObjectID());
+			}
+		}
+
+		LaunchShipTask* launchTask = new LaunchShipTask(player, _this.getReferenceUnsafeStaticCast(), groupVector, zone->getZoneName());
+
+		if (launchTask != nullptr) {
+			launchTask->schedule(1000);
+		}
+
+		return 0;
+	}
+
+	return 1;
+}
+
+void ShipControlDeviceImplementation::fillAttributeList(AttributeListMessage* alm, CreatureObject* object) {
+	alm->insertAttribute("parking_spot", getParkingLocation());
 }
 
 bool ShipControlDeviceImplementation::canBeTradedTo(CreatureObject* player, CreatureObject* receiver, int numberInTrade) {
-	ManagedReference<SceneObject*> datapad = receiver->getSlottedObject("datapad");
-
-	if (datapad == nullptr)
+	if (player == nullptr) {
 		return false;
+	}
 
-	ManagedReference<PlayerManager*> playerManager = player->getZoneServer()->getPlayerManager();
+	StringIdChatParameter cannotTrade;
+	cannotTrade.setStringId("@ui_trade:add_item_failed_prose");
+	cannotTrade.setTT(getObjectID());
 
-	int shipsInDatapad = numberInTrade;
-	int maxStoredShips = playerManager->getBaseStoredShips();
+	player->sendSystemMessage(cannotTrade); // You cannot trade %TT.
 
-	for (int i = 0; i < datapad->getContainerObjectsSize(); i++) {
-		Reference<SceneObject*> obj =  datapad->getContainerObject(i).castTo<SceneObject*>();
+	return false;
+}
 
-		if (obj != nullptr && obj->isShipControlDevice() ){
-			shipsInDatapad++;
+int ShipControlDeviceImplementation::canBeDestroyed(CreatureObject* player) {
+	if (player == nullptr)
+		return 1;
+
+	auto ship = controlledObject.get().castTo<ShipObject*>();
+
+	if (ship == nullptr) {
+		return 1;
+	}
+
+	auto owner = ship->getOwner().get();
+
+	if (owner == nullptr) {
+		return 1;
+	}
+
+	if (isShipLaunched()) {
+		player->sendSystemMessage("You must land your ship before it can be destroyed.");
+		return 1;
+	} else if (ship->isPobShip()) {
+		auto pobShip = ship->asPobShip();
+
+		if (pobShip != nullptr && pobShip->getCurrentNumberOfPlayerItems() > 0) {
+			owner->sendSystemMessage("You must remove all of your items from your ship before it can be destroyed.");
+			return 1;
 		}
 	}
 
-	if( shipsInDatapad >= maxStoredShips){
-		player->sendSystemMessage("That person has too many ships in their datapad");
-		receiver->sendSystemMessage("You already have the maximum number of ships that you can own.");
-		return false;
+	return IntangibleObjectImplementation::canBeDestroyed(player);
+}
+
+void ShipControlDeviceImplementation::destroyObjectFromDatabase(bool destroyContainedObjects) {
+	auto ship = getControlledObject();
+
+	if (ship != nullptr && ship->getLocalZone() != nullptr) {
+		Locker clock(ship, _this.getReferenceUnsafeStaticCast());
+
+		ship->destroyObjectFromDatabase(true);
 	}
 
-	return true;
+	IntangibleObjectImplementation::destroyObjectFromDatabase(destroyContainedObjects);
+}
+
+// The control device needs to be locked as well as the player coming into this function
+void ShipControlDeviceImplementation::setStoredLocationData(CreatureObject* player) {
+	if (player == nullptr)
+		return;
+
+	auto ghost = player->getPlayerObject();
+
+	if (ghost == nullptr) {
+		return;
+	}
+
+	auto ship = controlledObject.get().castTo<ShipObject*>();
+
+	if (ship == nullptr) {
+		return;
+	}
+
+	auto zone = player->getZone();
+
+	if (zone == nullptr) {
+		return;
+	}
+
+	auto planetManager = zone->getPlanetManager();
+
+	if (planetManager == nullptr) {
+		return;
+	}
+
+	auto travelPoint = planetManager->getNearestPlanetTravelPoint(player->getWorldPosition());
+
+	if (travelPoint == nullptr) {
+		return;
+	}
+
+	Vector3 position = travelPoint->getArrivalPosition();
+	String pointName = travelPoint->getPointName();
+	String zoneName = zone->getZoneName();
+
+	float z = CollisionManager::getWorldFloorCollision(position.getX(), position.getY(), position.getZ(), zone, true);
+	position.setZ(z);
+
+	storedPosition = position;
+	parkingLocation = pointName;
+	storedZoneName = zoneName;
+
+	ghost->setSpaceLaunchLocation(position);
+	ghost->setSpaceLaunchCityName(pointName);
+	ghost->setSpaceLaunchZone(zoneName);
+
+	ship->setSpaceLaunchLocation(position);
+	ship->setSpaceLaunchCityName(pointName);
+	ship->setSpaceLaunchZone(zoneName);
+}
+
+Vector3 ShipControlDeviceImplementation::getStoredPosition(bool randomPosition) {
+	Vector3 random = randomPosition ? Vector3(System::random(10) - 5, System::random(10) - 5, 0) : Vector3::ZERO;
+	return storedPosition + random;
+}
+
+bool ShipControlDeviceImplementation::isShipLaunched() {
+	auto ship = controlledObject.get().castTo<ShipObject*>();
+
+	if (ship == nullptr)
+		return false;
+
+	return ship->isShipLaunched();
 }

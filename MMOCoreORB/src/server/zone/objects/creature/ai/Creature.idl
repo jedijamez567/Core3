@@ -84,8 +84,6 @@ class Creature extends AiAgent {
 	@local
 	public native void loadTemplateDataForBaby(CreatureTemplate templateData);
 
-	public native void scheduleDespawn();
-
 	public native boolean hasOrganics();
 
 	public native boolean hasMilk();
@@ -228,14 +226,9 @@ class Creature extends AiAgent {
 	@local
 	public native void sendMessage(BasePacket msg);
 
-	public int getAdultLevel() {
-		if (super.petDeed) {
-			return super.petDeed.getLevel();
-		}
-		if (!super.npcTemplate)
-			return super.getLevel();
+	public native int getAdultLevel();
 
-		return super.npcTemplate.getLevel();
-	}
+	@read
+	public native boolean hasBeenMilked();
 }
 

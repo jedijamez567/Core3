@@ -89,7 +89,7 @@ kaja_orzee_missions =
 			{
 				{ rewardType = "faction", faction = "imperial", amount = 75 },
 				{ rewardType = "loot", lootGroup = "theme_park_reward_imperial_kaja"} ,
-				{ rewardType = "permission", permissionGroup = "emperors_retreat2" }
+				{ rewardType = "permission", permissionGroup = "@naboo_region_names:emperors_retreat2" }
 			}
 		}
 	}
@@ -784,7 +784,7 @@ npcMapImperial =
 permissionMapImperial = {
 	{
 		planetName = "naboo",
-		regionName = "emperors_retreat",
+		regionName = "@naboo_region_names:emperors_retreat",
 		permissions =
 		{
 			{

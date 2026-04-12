@@ -4,6 +4,8 @@ includeFile("crackdown.lua")
 includeFile("deathWatch.lua")
 includeFile("enclaveSentinel.lua")
 includeFile("escort.lua")
+includeFile("eventControl.lua")
+includeFile("herd.lua")
 includeFile("pet.lua")
 includeFile("static.lua")
 includeFile("villageRaider.lua")
@@ -62,6 +64,7 @@ bitmaskLookup = {
 
 	{PET, {
 		{NONE, "rootPet"},
+		{ATTACK, "attackPet"},
 		{AWARE, "awarePet"},
 		{EQUIP, "equipPet"},
 		{IDLE, "idlePet"},
@@ -72,6 +75,7 @@ bitmaskLookup = {
 
 	{FACTION_PET, {
 		{NONE, "rootPet"},
+		{ATTACK, "attackPet"},
 		{AWARE, "awarePet"},
 		{EQUIP, "equipPet"},
 		{IDLE, "idlePet"},
@@ -90,6 +94,7 @@ bitmaskLookup = {
 	}},
 
 	{ESCORT, {
+		{AWARE, "awareEscort"},
 		{IDLE, "runEscort"},
 		{MOVE, "moveEscort"},
 		{TARGET, "targetDefault"}
@@ -117,6 +122,17 @@ bitmaskLookup = {
 		{AWARE, "awareCrackdown"},
 		{IDLE, "idleCrackdown"},
 		{LOOKAT, "lookCrackdown"}
+	}},
+
+	{EVENTCONTROL, {
+		{NONE, "rootCrackdown"},
+		{AWARE, "awareCrackdown"},
+		{IDLE, "idleEventcontrol"},
+		{LOOKAT, "lookCrackdown"}
+	}},
+
+	{HERD, {
+		{IDLE, "idleHerd"},
 	}},
 
 	{TEST, {

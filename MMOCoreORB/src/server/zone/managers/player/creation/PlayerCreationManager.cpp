@@ -14,21 +14,20 @@
 #include "server/zone/objects/player/PlayerObject.h"
 #include "server/zone/packets/charcreation/ClientCreateCharacterCallback.h"
 #include "server/zone/packets/charcreation/ClientCreateCharacterSuccess.h"
+#include "server/zone/packets/charcreation/ClientCreateCharacterFailed.h"
 #include "templates/manager/TemplateManager.h"
 #include "templates/datatables/DataTableIff.h"
 #include "templates/datatables/DataTableRow.h"
 #include "templates/creation/SkillDataForm.h"
 #include "templates/creature/PlayerCreatureTemplate.h"
 #include "server/ServerCore.h"
-#include "server/zone/objects/intangible/ShipControlDevice.h"
-#include "server/zone/objects/ship/ShipObject.h"
 #include "templates/customization/CustomizationIdManager.h"
 #include "server/zone/managers/skill/imagedesign/ImageDesignManager.h"
 #include "server/zone/managers/jedi/JediManager.h"
 #include "server/zone/objects/transaction/TransactionLog.h"
+#include "server/zone/managers/player/creation/SendJtlRecruitment.h"
 
-PlayerCreationManager::PlayerCreationManager() :
-		Logger("PlayerCreationManager") {
+PlayerCreationManager::PlayerCreationManager() : Logger("PlayerCreationManager") {
 	setLogging(false);
 	setGlobalLogging(false);
 
@@ -52,7 +51,6 @@ PlayerCreationManager::PlayerCreationManager() :
 }
 
 PlayerCreationManager::~PlayerCreationManager() {
-
 }
 
 void PlayerCreationManager::loadRacialCreationData() {
@@ -115,8 +113,7 @@ void PlayerCreationManager::loadRacialCreationData() {
 
 void PlayerCreationManager::loadProfessionDefaultsInfo() {
 	TemplateManager* templateManager = TemplateManager::instance();
-	IffStream* iffStream = templateManager->openIffFile(
-			"creation/profession_defaults.iff");
+	IffStream* iffStream = templateManager->openIffFile("creation/profession_defaults.iff");
 
 	if (iffStream == nullptr) {
 		error("Could not open creation profession data.");
@@ -128,7 +125,7 @@ void PlayerCreationManager::loadProfessionDefaultsInfo() {
 
 	delete iffStream;
 
-	//Load the data into useful structs and store them in a map.
+	// Load the data into useful structs and store them in a map.
 	for (int i = 0; i < pfdt.getTotalPaths(); ++i) {
 		String name = pfdt.getSkillNameAt(i);
 		String path = pfdt.getPathBySkillName(name);
@@ -146,9 +143,8 @@ void PlayerCreationManager::loadProfessionDefaultsInfo() {
 		debug() << "Loading: " << pfdt.getSkillNameAt(i) << " Path: " << pfdt.getPathBySkillName(pfdt.getSkillNameAt(i));
 	}
 
-	//Now we want to load the profession mods.
-	iffStream = templateManager->openIffFile(
-			"datatables/creation/profession_mods.iff");
+	// Now we want to load the profession mods.
+	iffStream = templateManager->openIffFile("datatables/creation/profession_mods.iff");
 
 	if (iffStream == nullptr) {
 		error("Could not open creation profession mods data table");
@@ -167,9 +163,8 @@ void PlayerCreationManager::loadProfessionDefaultsInfo() {
 		String key;
 		row->getValue(0, key);
 
-		//Check if the professionInfo for this exists.
-		Reference<ProfessionDefaultsInfo*> pdi = professionDefaultsInfo.get(
-				key);
+		// Check if the professionInfo for this exists.
+		Reference<ProfessionDefaultsInfo*> pdi = professionDefaultsInfo.get(key);
 
 		if (pdi == nullptr)
 			continue;
@@ -229,8 +224,7 @@ void PlayerCreationManager::loadDefaultCharacterItems() {
 }
 
 void PlayerCreationManager::loadHairStyleInfo() {
-	IffStream* iffStream = TemplateManager::instance()->openIffFile(
-			"creation/default_pc_hairstyles.iff");
+	IffStream* iffStream = TemplateManager::instance()->openIffFile("creation/default_pc_hairstyles.iff");
 
 	if (iffStream == nullptr) {
 		error("Couldn't load creation hair styles.");
@@ -290,24 +284,19 @@ void PlayerCreationManager::loadLuaStartingItems(Lua* lua) {
 		// Read professions.
 		Vector < String > professions;
 		LuaObject professionsLuaObject = lua->getGlobalObject("professions");
-		for (int professionNumber = 1;
-				professionNumber <= professionsLuaObject.getTableSize();
-				professionNumber++) {
+
+		for (int professionNumber = 1; professionNumber <= professionsLuaObject.getTableSize(); professionNumber++) {
 			professions.add(professionsLuaObject.getStringAt(professionNumber));
 		}
+
 		professionsLuaObject.pop();
 
 		// Read profession specific items.
-		LuaObject professionSpecificItems = lua->getGlobalObject(
-				"professionSpecificItems");
-		for (int professionNumber = 0; professionNumber < professions.size();
-				professionNumber++) {
-			LuaObject professionSpecificItemList =
-					professionSpecificItems.getObjectField(
-							professions.get(professionNumber));
-			for (int itemNumber = 1;
-					itemNumber <= professionSpecificItemList.getTableSize();
-					itemNumber++) {
+		LuaObject professionSpecificItems = lua->getGlobalObject("professionSpecificItems");
+		for (int professionNumber = 0; professionNumber < professions.size(); professionNumber++) {
+			LuaObject professionSpecificItemList = professionSpecificItems.getObjectField(professions.get(professionNumber));
+
+			for (int itemNumber = 1; itemNumber <= professionSpecificItemList.getTableSize(); itemNumber++) {
 				auto& val = professionDefaultsInfo.get(professions.get(professionNumber));
 				auto itemObj = professionSpecificItemList.getStringAt(itemNumber);
 				val->getStartingItems()->add(itemObj);
@@ -317,13 +306,9 @@ void PlayerCreationManager::loadLuaStartingItems(Lua* lua) {
 		professionSpecificItems.pop();
 
 		// Read common starting items.
-		LuaObject commonStartingItemsLuaObject = lua->getGlobalObject(
-				"commonStartingItems");
-		for (int itemNumber = 1;
-				itemNumber <= commonStartingItemsLuaObject.getTableSize();
-				itemNumber++) {
-			commonStartingItems.add(
-					commonStartingItemsLuaObject.getStringAt(itemNumber));
+		LuaObject commonStartingItemsLuaObject = lua->getGlobalObject("commonStartingItems");
+		for (int itemNumber = 1; itemNumber <= commonStartingItemsLuaObject.getTableSize(); itemNumber++) {
+			commonStartingItems.add(commonStartingItemsLuaObject.getStringAt(itemNumber));
 		}
 		commonStartingItemsLuaObject.pop();
 	} catch (Exception& e) {
@@ -336,8 +321,9 @@ bool PlayerCreationManager::createCharacter(ClientCreateCharacterCallback* callb
 	TemplateManager* templateManager = TemplateManager::instance();
 
 	auto client = callback->getClient();
+	auto maxchars = ConfigManager::instance()->getInt("Core3.PlayerCreationManager.MaxCharactersPerGalaxy", 10);
 
-	if (client->getCharacterCount(zoneServer.get()->getGalaxyID()) >= 10) {
+	if (client->getCharacterCount(zoneServer.get()->getGalaxyID()) >= maxchars) {
 		ErrorMessage* errMsg = new ErrorMessage("Create Error", "You are limited to 10 characters per galaxy.", 0x0);
 		client->sendMessage(errMsg);
 
@@ -361,9 +347,7 @@ bool PlayerCreationManager::createCharacter(ClientCreateCharacterCallback* callb
 
 	uint32 serverObjectCRC = raceFile.hashCode();
 
-	PlayerCreatureTemplate* playerTemplate =
-			dynamic_cast<PlayerCreatureTemplate*>(templateManager->getTemplate(
-					serverObjectCRC));
+	PlayerCreatureTemplate* playerTemplate = dynamic_cast<PlayerCreatureTemplate*>(templateManager->getTemplate(serverObjectCRC));
 
 	if (playerTemplate == nullptr) {
 		error("Unknown player template selected: " + raceFile);
@@ -371,8 +355,7 @@ bool PlayerCreationManager::createCharacter(ClientCreateCharacterCallback* callb
 	}
 
 	String fileName = playerTemplate->getTemplateFileName();
-	String clientTemplate = templateManager->getTemplateFile(
-			playerTemplate->getClientObjectCRC());
+	String clientTemplate = templateManager->getTemplateFile(playerTemplate->getClientObjectCRC());
 
 	RacialCreationData* raceData = racialCreationData.get(fileName);
 
@@ -392,18 +375,15 @@ bool PlayerCreationManager::createCharacter(ClientCreateCharacterCallback* callb
 	callback->getHairCustomization(hairCustomization);
 
 	float height = callback->getHeight();
-	height = Math::max(Math::min(height, playerTemplate->getMaxScale()),
-			playerTemplate->getMinScale());
+	height = Math::max(Math::min(height, playerTemplate->getMaxScale()), playerTemplate->getMinScale());
 
 	//validate biography
 	UnicodeString bio;
 	callback->getBiography(bio);
 
-	bool doTutorial = ConfigManager::instance()->getBool("Core3.PlayerCreationManager.EnableTutorial", callback->getTutorialFlag());
+	bool doTutorial = ConfigManager::instance()->getBool("Core3.PlayerCreationManager.EnableTutorial", false) && callback->getTutorialFlag();
 
-	ManagedReference<CreatureObject*> playerCreature =
-			zoneServer.get()->createObject(
-					serverObjectCRC, 2).castTo<CreatureObject*>();
+	ManagedReference<CreatureObject*> playerCreature = zoneServer.get()->createObject(serverObjectCRC, 2).castTo<CreatureObject*>();
 
 	if (playerCreature == nullptr) {
 		error("Could not create player with template: " + raceFile);
@@ -422,6 +402,7 @@ bool PlayerCreationManager::createCharacter(ClientCreateCharacterCallback* callb
 	// Set starting cash and starting bank
 	playerCreature->clearCashCredits(false);
 	playerCreature->clearBankCredits(false);
+
 	{
 		TransactionLog trx(TrxCode::CHARACTERCREATION, playerCreature, startingCash, true);
 		playerCreature->addCashCredits(startingCash, false);
@@ -439,34 +420,22 @@ bool PlayerCreationManager::createCharacter(ClientCreateCharacterCallback* callb
 		ghost->setStarterProfession(profession);
 	}
 
-	addCustomization(playerCreature, customization,
-			playerTemplate->getAppearanceFilename());
+	addCustomization(playerCreature, customization, playerTemplate->getAppearanceFilename());
 	addHair(playerCreature, hairTemplate, hairCustomization);
 
-	// Load the account BEFORE addProfessionStartingItems so that the
-	// SkillManager::fulfillsSkillPrerequisites bypass for jedi-unlocked
-	// accounts can see ghost->getAccount() during the PRFI skill grant.
-	// initializeAccount() is idempotent (it lazy-loads only when account==nullptr),
-	// so the duplicate call further down stays a safe no-op.
 	if (ghost != nullptr) {
 		ghost->setAccountID(client->getAccountID());
 		ghost->initializeAccount();
 	}
 
 	if (!doTutorial) {
-		addProfessionStartingItems(playerCreature, profession, clientTemplate,
-				false);
+		addProfessionStartingItems(playerCreature, profession, clientTemplate, false);
 		addStartingItems(playerCreature, clientTemplate, false);
-		addRacialMods(playerCreature, fileName,
-				&playerTemplate->getStartingSkills(),
-				&playerTemplate->getStartingItems(), false);
+		addRacialMods(playerCreature, fileName, &playerTemplate->getStartingSkills(), &playerTemplate->getStartingItems(), false);
 	} else {
-		addProfessionStartingItems(playerCreature, profession, clientTemplate,
-				true);
+		addProfessionStartingItems(playerCreature, profession, clientTemplate, true);
 		addStartingItems(playerCreature, clientTemplate, true);
-		addRacialMods(playerCreature, fileName,
-				&playerTemplate->getStartingSkills(),
-				&playerTemplate->getStartingItems(), true);
+		addRacialMods(playerCreature, fileName, &playerTemplate->getStartingSkills(), &playerTemplate->getStartingItems(), true);
 	}
 
 	if (ghost != nullptr) {
@@ -494,7 +463,38 @@ bool PlayerCreationManager::createCharacter(ClientCreateCharacterCallback* callb
 					playerManager->updatePermissionLevel(playerCreature, accountPermissionLevel);
 				}
 
-				if (accountPermissionLevel < 9 && characterCreationCooldown > 0) {
+				if (accountPermissionLevel < 9) {
+#ifndef WITH_SWGREALMS_API
+					try {
+						StringBuffer query;
+						uint32 galaxyId = zoneServer.get()->getGalaxyID();
+						uint32 accountId = client->getAccountID();
+						query << "(SELECT UNIX_TIMESTAMP(c.creation_date) as t FROM characters as c WHERE c.account_id = " << accountId << " AND c.galaxy_id = " << galaxyId << " ORDER BY c.creation_date DESC) UNION (SELECT UNIX_TIMESTAMP(d.creation_date) FROM deleted_characters as d WHERE d.account_id = " << accountId << " AND d.galaxy_id = " << galaxyId << " ORDER BY d.creation_date DESC) ORDER BY t DESC LIMIT 1";
+
+						UniqueReference<ResultSet*> res(ServerDatabase::instance()->executeQuery(query));
+
+						if (res != nullptr && res->next()) {
+							uint32 sec = res->getUnsignedInt(0);
+
+							Time timeVal(sec);
+
+							if (timeVal.miliDifference() < 3600000) {
+								ErrorMessage* errMsg = new ErrorMessage("Create Error", "You are only permitted to create one character per hour. Repeat attempts prior to 1 hour elapsing will reset the timer.", 0x0);
+								client->sendMessage(errMsg);
+
+								playerCreature->destroyPlayerCreatureFromDatabase(true);
+								return false;
+							}
+						}
+					} catch (const DatabaseException& e) {
+						error(e.getMessage());
+					}
+#else // WITH_SWGREALMS_API
+				// Rate limiting is enforced by API during POST /characters
+				// If rate limited, API returns 429 and createCharacterBlocking fails
+				// No separate check needed
+#endif // WITH_SWGREALMS_API
+
 					Locker locker(&charCountMutex);
 
 					if (lastCreatedCharacter.containsKey(accID)) {
@@ -525,31 +525,27 @@ bool PlayerCreationManager::createCharacter(ClientCreateCharacterCallback* callb
 			playerManager->updatePermissionLevel(playerCreature, PermissionLevelList::instance()->getLevelNumber("admin"));
 		}
 
-		if (doTutorial)
+		if (doTutorial) {
 			playerManager->createTutorialBuilding(playerCreature);
-		else
-			playerManager->createSkippedTutorialBuilding(playerCreature);
+		} else {
+			playerManager->insertIntoSkippedTutorialBuilding(playerCreature);
+		}
 
-		ValidatedPosition* lastValidatedPosition =
-				ghost->getLastValidatedPosition();
+		ValidatedPosition* lastValidatedPosition = ghost->getLastValidatedPosition();
 		lastValidatedPosition->update(playerCreature);
 
 		ghost->setBiography(bio);
-
 		ghost->setLanguageID(playerTemplate->getDefaultLanguage());
+
+		Time now;
+		ghost->setBirthDate(now.getTime());
 	}
-
-	ClientCreateCharacterSuccess* msg = new ClientCreateCharacterSuccess(
-			playerCreature->getObjectID());
-	playerCreature->sendMessage(msg);
-
-	ChatManager* chatManager = zoneServer.get()->getChatManager();
-	chatManager->addPlayer(playerCreature);
 
 	String firstName = playerCreature->getFirstName();
 	String lastName = playerCreature->getLastName();
 	int raceID = playerTemplate->getRace();
 
+#ifndef WITH_SWGREALMS_API
 	try {
 		StringBuffer query;
 		query
@@ -565,13 +561,80 @@ bool PlayerCreationManager::createCharacter(ClientCreateCharacterCallback* callb
 		error(e.getMessage());
 	}
 
+	ClientCreateCharacterSuccess* msg = new ClientCreateCharacterSuccess(
+			playerCreature->getObjectID());
+	playerCreature->sendMessage(msg);
+#else // WITH_SWGREALMS_API
+	auto swgRealmsAPI = SWGRealmsAPI::instance();
+	if (swgRealmsAPI == nullptr) {
+		error("SWGRealms API not available for character creation");
+		playerCreature->destroyPlayerCreatureFromDatabase(true);
+
+		ClientCreateCharacterFailed* failMsg = new ClientCreateCharacterFailed("Unable to create characters, please contact support and mention, code=NullAPI");
+		client->sendMessage(failMsg);
+
+		return false;
+	}
+
+	String errorMessage;
+	String reservationID = "";
+
+	// Reserve character name to prevent race conditions
+	if (!swgRealmsAPI->reserveCharacterNameBlocking(
+			zoneServer.get()->getGalaxyID(),
+			firstName,
+			lastName,
+			reservationID,
+			errorMessage)) {
+		error("Failed to reserve character name: " + errorMessage);
+		playerCreature->destroyPlayerCreatureFromDatabase(true);
+
+		ClientCreateCharacterFailed* failMsg = new ClientCreateCharacterFailed("Character name unavailable: " + errorMessage);
+		client->sendMessage(failMsg);
+
+		return false;
+	}
+
+	if (!swgRealmsAPI->createCharacterBlocking(
+			playerCreature->getObjectID(),
+			client->getAccountID(),
+			zoneServer.get()->getGalaxyID(),
+			firstName, lastName,
+			raceID, 0, raceFile,
+			reservationID,
+			errorMessage)) {
+		error("Failed to create character via API: " + errorMessage);
+		playerCreature->destroyPlayerCreatureFromDatabase(true);
+
+		ClientCreateCharacterFailed* failMsg = new ClientCreateCharacterFailed(errorMessage);
+		client->sendMessage(failMsg);
+
+		return false;
+	}
+
+	ClientCreateCharacterSuccess* msg = new ClientCreateCharacterSuccess(
+			playerCreature->getObjectID());
+	playerCreature->sendMessage(msg);
+#endif // WITH_SWGREALMS_API
+
+	ChatManager* chatManager = zoneServer.get()->getChatManager();
+	chatManager->addPlayer(playerCreature);
+
 	playerManager->addPlayer(playerCreature);
 
 	client->addCharacter(playerCreature->getObjectID(), zoneServer.get()->getGalaxyID());
 
 	JediManager::instance()->onPlayerCreated(playerCreature);
 
+	// Welcome Mail
 	chatManager->sendMail("system", "@newbie_tutorial/newbie_mail:welcome_subject", "@newbie_tutorial/newbie_mail:welcome_body", playerCreature->getFirstName());
+
+	// Schedule Task to send out JTL Recruitment Mail
+	SendJtlRecruitment* jtlMailTask = new SendJtlRecruitment(playerCreature);
+
+	if (jtlMailTask != nullptr) {
+		jtlMailTask->schedule(10000);
+	}
 
 	//Join auction chat room
 	ghost->addChatRoom(chatManager->getAuctionRoom()->getRoomID());
@@ -839,8 +902,7 @@ void PlayerCreationManager::addHair(CreatureObject* creature,
 
 	data.parseFromClientString(hairCustomization);
 
-	if (ImageDesignManager::validateCustomizationString(&data,
-			appearanceFilename, -1))
+	if (ImageDesignManager::validateCustomizationString(&data, appearanceFilename))
 		tanoHair->setCustomizationString(hairCustomization);
 
 	creature->transferObject(tanoHair, 4);
@@ -853,16 +915,14 @@ void PlayerCreationManager::addCustomization(CreatureObject* creature,
 
 	data.parseFromClientString(customizationString);
 
-	if (ImageDesignManager::validateCustomizationString(&data,
-			appearanceFilename, -1))
+	if (ImageDesignManager::validateCustomizationString(&data, appearanceFilename))
 		creature->setCustomizationString(customizationString);
 }
 
 void PlayerCreationManager::addStartingItemsInto(CreatureObject* creature,
 		SceneObject* container) const {
 
-	if (creature == nullptr || container == nullptr
-			|| !creature->isPlayerCreature()) {
+	if (creature == nullptr || container == nullptr || !creature->isPlayerCreature()) {
 		instance()->info("addStartingItemsInto: nullptr or not PlayerCreature");
 		return;
 	}
@@ -966,7 +1026,6 @@ void PlayerCreationManager::addStartingWeaponsInto(CreatureObject* creature,
 
 	if (professionData == nullptr)
 		professionData = professionDefaultsInfo.get(0);
-
 
 	//Add common starting items.
 	for (int itemNumber = 0; itemNumber < commonStartingItems.size();

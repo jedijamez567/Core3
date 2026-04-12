@@ -20,6 +20,7 @@
 #include "server/zone/objects/area/areashapes/CircularAreaShape.h"
 #include "server/zone/objects/transaction/TransactionLog.h"
 #include "server/zone/Zone.h"
+#include "server/zone/managers/gcw/GCWManager.h"
 
 
 int PlaceStructureSessionImplementation::constructStructure(float x, float y, int angle) {
@@ -67,6 +68,14 @@ int PlaceStructureSessionImplementation::constructStructure(float x, float y, in
 
 			constructionDuration = serverTemplate->getLotSize() * 3000; //3 seconds per lot.
 
+			if (serverTemplatePath.contains("faction_perk")) {
+				GCWManager* gcwMan = thisZone->getGCWManager();
+
+				if (gcwMan != nullptr) {
+					constructionDuration = gcwMan->getBasePlacementDelay() * 1000;
+				}
+			}
+
 			constructionBarricade = barricade;
 		}
 	}
@@ -102,7 +111,7 @@ void PlaceStructureSessionImplementation::placeTemporaryNoBuildZone(const Shared
 
 	noBuildZone->initializePosition(positionX, 0, positionY);
 	noBuildZone->setAreaShape(areaShape);
-	noBuildZone->setNoBuildArea(true);
+	noBuildZone->addAreaFlag(ActiveArea::NOBUILDZONEAREA);
 
 	thisZone->transferObject(noBuildZone, -1, true);
 

@@ -18,13 +18,12 @@ include system.util.Vector;
 include engine.util.u3d.Vector3;
 
 class SquadObserver extends Observer implements Logger {
-
 	@local
 	@dereferenced
 	protected Vector<AiAgent> teamMembers;
 
 	@dereferenced
-	protected transient Mutex containmentTeamLock;
+	protected transient Mutex squadLock;
 
 	public SquadObserver() {
 		super();
@@ -33,16 +32,28 @@ class SquadObserver extends Observer implements Logger {
 	}
 
 	@local
+	@read
+	public int size() {
+		return teamMembers.size();
+	}
+
+	@local
+	@preLocked
+	public native void removeMember(int index) {
+		teamMembers.remove(index);
+	}
+
+	@local
 	public native void addMember(AiAgent member);
 
 	@local
-	public native int size();
+	public native AiAgent getMember(int teamMemberIndex);
 
 	@local
-	public native AiAgent getMember(unsigned int teamMemberIndex);
+	public native int getMemberPosition(unsigned long memberID);
 
 	@local
-	public native void removeMember(unsigned int teamMemberIndex);
+	public native void despawnSquad();
 
 	@local
 	public native boolean despawnMembersCloseToLambdaShuttle(@dereferenced final Vector3 landingPosition, boolean forcedCleanup);

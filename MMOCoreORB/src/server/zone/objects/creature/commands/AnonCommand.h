@@ -16,7 +16,6 @@ public:
 	}
 
 	int doQueueCommand(CreatureObject* creature, const uint64& target, const UnicodeString& arguments) const {
-
 		if (!checkStateMask(creature))
 			return INVALIDSTATE;
 
@@ -26,16 +25,10 @@ public:
 		if (!creature->isPlayerCreature())
 			return GENERALERROR;
 
-		Reference<PlayerObject*> ghost = creature->getSlottedObject("ghost").castTo<PlayerObject*>();
-
-		if (ghost->isAnonymous())
-			creature->sendSystemMessage("@ui_who:anonymous_false");
-		else
-			creature->sendSystemMessage("@ui_who:anonymous_true");
+		PlayerObject* ghost = creature->getPlayerObject();
 
 		if (ghost != nullptr)
-			ghost->toggleCharacterBit(PlayerObject::ANONYMOUS);
-
+			ghost->toggleCharacterBit(PlayerBitmasks::ANONYMOUS);
 
 		return SUCCESS;
 	}

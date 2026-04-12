@@ -8,6 +8,8 @@
 #ifndef COMBATMANAGER_H_
 #define COMBATMANAGER_H_
 
+//#define TOHIT_DEBUG
+
 #include "DefenderHitList.h"
 #include "server/zone/objects/creature/CreatureObject.h"
 #include "server/zone/objects/creature/VehicleObject.h"
@@ -18,17 +20,19 @@ class CreatureAttackData;
 class CombatQueueCommand;
 
 class CombatManager : public Singleton<CombatManager>, public Logger, public Object {
-
 public:
-	// hitstatus: 0x0-MISS 0x1-HIT 0x2-BLOCK 0x3-DODGE 0x5-COUNTER 0x7-RICOCHET 0x8-REFLECT 0x9-REFLECT_TO_TARGET
-	const static int MISS = 0x00;
-	const static int HIT = 0x01;
-	const static int BLOCK = 0x02;
-	const static int DODGE = 0x03;
-	const static int COUNTER = 0x05;
-	const static int RICOCHET = 0x07;
-	const static int REFLECT = 0x08;
-	const static int REFLECT_TO_TARGET = 0x09;
+	enum HitStatus : int {
+		 MISS = 0,
+		 HIT = 1,
+		 BLOCK = 2,
+		 DODGE = 3,
+		 REDIRECT = 4,
+		 COUNTER = 5,
+		 FUMBLE = 6,
+		 RICOCHET = 7,
+		 REFLECT = 8,
+		 REFLECT_TO_TARGET = 9,
+	};
 
 	// trails bitmask
 	const static int NOTRAIL = 0x00;
@@ -39,14 +43,22 @@ public:
 	const static int WEAPONTRAIL = 0x10;
 	const static int DEFAULTTRAIL = 0xFF;
 
+	// poolsToDamage
 	const static int NONE = 0;
 	const static int HEALTH = 1;
 	const static int ACTION = 2;
 	const static int MIND = 4;
 	const static int RANDOM = 8;
 
-	// hitLocations
-	enum HitLocations { HIT_NONE, HIT_BODY, HIT_LARM, HIT_RARM, HIT_LLEG, HIT_RLEG, HIT_HEAD };
+	enum hitLocation : int {
+		HIT_BODY = 0,
+		HIT_HEAD = 1,
+		HIT_RARM = 2,
+		HIT_LARM = 3,
+		HIT_RLEG = 4,
+		HIT_LLEG = 5,
+		HIT_NUM = 6,
+	};
 
 	//Mitigation types
 	const static int PSG = 0x1;
@@ -56,6 +68,34 @@ public:
 	const static int FORCEARMOR = 0x5;
 	const static int ARMOR = 0x6;
 	const static int FOOD = 0x7;
+
+	// toHitChance
+	const static constexpr float toHitScale = 50.f;
+	const static constexpr float toHitBase = 75.f;
+	const static constexpr float toHitStep = 25.f;
+	const static constexpr float toHitStepMax = toHitBase / toHitStep;
+	const static constexpr float toHitMax = 100.f;
+	const static constexpr float toHitMin = 0.f;
+
+	// weaponType
+	enum WeaponType {
+		THROWNWEAPON = 0x1,
+		HEAVYWEAPON = 0x2,
+		MINEWEAPON = 0x4,
+		SPECIALHEAVYWEAPON = 0x8,
+		UNARMEDWEAPON = 0x10,
+		ONEHANDMELEEWEAPON = 0x20,
+		TWOHANDMELEEWEAPON = 0x40,
+		POLEARMWEAPON = 0x80,
+		PISTOLWEAPON = 0x100,
+		CARBINEWEAPON = 0x200,
+		RIFLEWEAPON = 0x400,
+		GRENADEWEAPON = 0x800,
+		LIGHTNINGRIFLEWEAPON = 0x1000,
+		ONEHANDJEDIWEAPON = 0x2000,
+		TWOHANDJEDIWEAPON = 0x4000,
+		POLEARMJEDIWEAPON = 0x8000
+	};
 
 	Vector<uint32> defaultMeleeAttacks;
 	Vector<uint32> defaultRangedAttacks;
@@ -148,6 +188,15 @@ public:
 
 	bool areInDuel(CreatureObject* player1, CreatureObject* player2) const;
 
+	/**
+	 * Checks if there is an active challenge
+	 * @param challenger player that is being checked if they have an open challenge for target
+	 * @param targetPlayer target
+	 * @pre { challenger != targetPlayer, challenger is locked }
+	 * @post { challenger is locked }
+	 */
+	bool hasActiveDuelChallenge(CreatureObject* challenger, CreatureObject* targetPlayer) const;
+
 	float calculateWeaponAttackSpeed(CreatureObject* attacker, WeaponObject* weapon, float skillSpeedRatio) const;
 
 	void broadcastCombatAction(CreatureObject * attacker, WeaponObject* weapon, SortedVector<DefenderHitList*> targetDefenders, const CreatureAttackData & data) const;
@@ -156,8 +205,8 @@ public:
 	void broadcastCombatSpam(TangibleObject* attacker, TangibleObject* defender, TangibleObject* item, int damage, const String& file, const String& stringName, byte color) const;
 	void sendMitigationCombatSpam(CreatureObject* defender, TangibleObject* item, uint32 damage, int type) const;
 
-	float hitChanceEquation(float attackerAccuracy, float attackerRoll, float targetDefense, float defenderRoll) const;
-	float doDroidDetonation(CreatureObject* droid, CreatureObject* defender, float damage) const;
+	float hitChanceEquation(float attackerAccuracy, float targetDefense) const;
+	float doObjectDetonation(TangibleObject* droid, CreatureObject* defender, float damage, WeaponObject* weapon = nullptr) const;
 
 	void checkForTefs(CreatureObject* attacker, CreatureObject* defender, bool* shouldGcwCrackdownTef, bool* shouldGcwTef, bool* shouldBhTef) const;
 	void getFrsModifiedForceAttackDamage(CreatureObject* attacker, float& minDmg, float& maxDmg, const CreatureAttackData& data) const;
@@ -229,6 +278,42 @@ protected:
 	bool applySpecialAttackCost(CreatureObject* attacker, WeaponObject* weapon, const CreatureAttackData& data) const;
 
 	void applyStates(CreatureObject* creature, CreatureObject* targetCreature, DefenderHitList* hitList, const CreatureAttackData& data) const;
+
+	int getWeaponDefendResult(uint32 defendWeaponMask) const {
+		switch (defendWeaponMask) {
+			case WeaponType::ONEHANDMELEEWEAPON: return HitStatus::DODGE;
+			case WeaponType::TWOHANDMELEEWEAPON: return HitStatus::COUNTER;
+			case WeaponType::POLEARMWEAPON: return HitStatus::BLOCK;
+			case WeaponType::PISTOLWEAPON: return HitStatus::DODGE;
+			case WeaponType::CARBINEWEAPON: return HitStatus::COUNTER;
+			case WeaponType::RIFLEWEAPON: return HitStatus::BLOCK;
+			case WeaponType::ONEHANDJEDIWEAPON: return HitStatus::RICOCHET;
+			case WeaponType::TWOHANDJEDIWEAPON: return HitStatus::RICOCHET;
+			case WeaponType::POLEARMJEDIWEAPON: return HitStatus::RICOCHET;
+			default: {
+				const int defenseAcuity[] = { BLOCK, DODGE, COUNTER };
+				return defenseAcuity[System::random(2)];
+			}
+		}
+	}
+
+	float getWeaponPostureModifier(uint32 attackWeaponMask) const {
+		switch(attackWeaponMask) {
+			case WeaponType::RIFLEWEAPON: return 2.5f;
+			case WeaponType::CARBINEWEAPON: return 2.f;
+			case WeaponType::PISTOLWEAPON: return 1.5f;
+			case WeaponType::SPECIALHEAVYWEAPON: return 3.f;
+			case WeaponType::ONEHANDMELEEWEAPON: return 1.f;
+			case WeaponType::TWOHANDMELEEWEAPON: return 1.f;
+			case WeaponType::UNARMEDWEAPON: return 1.f;
+			case WeaponType::POLEARMWEAPON: return 1.f;
+			case WeaponType::THROWNWEAPON: return 1.f;
+			case WeaponType::ONEHANDJEDIWEAPON: return 1.f;
+			case WeaponType::TWOHANDJEDIWEAPON: return 1.f;
+			case WeaponType::POLEARMJEDIWEAPON: return 1.f;
+			default: return 1.f;
+		}
+	}
 };
 
 #endif /* COMBATMANAGER_H_ */

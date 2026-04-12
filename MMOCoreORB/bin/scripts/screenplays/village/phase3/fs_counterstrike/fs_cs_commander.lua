@@ -107,6 +107,8 @@ function FsCsCommander:setPlayerAsEscorter(pCommander, pPlayer)
 
 	AiAgent(pCommander):setFollowObject(pPlayer)
 	AiAgent(pCommander):setMovementState(AI_FOLLOWING)
+
+	AiAgent(pCommander):setAITemplate()
 end
 
 function FsCsCommander:createCommander(pTheater)
@@ -174,8 +176,8 @@ function FsCsCommander:createCommander(pTheater)
 		writeData(areaID .. ":theaterID", theaterID)
 	end
 
-	AiAgent(pCommander):addCreatureFlag(AI_ESCORT)
-	AiAgent(pCommander):addCreatureFlag(AI_FOLLOW)
+	AiAgent(pCommander):addObjectFlag(AI_ESCORT)
+	AiAgent(pCommander):addObjectFlag(AI_FOLLOW)
 	createEvent(self.commanderDespawnTime, "FsCsCommander", "killCommander", pCommander, "")
 end
 
@@ -474,7 +476,7 @@ function FsCsCommander:createCommanderWaypoint(pPlayer, theaterID)
 			wayDesc = "Return the Commander (Testing mode)"
 		end
 
-		local waypointID = PlayerObject(pGhost):addWaypoint("dathomir", wayDesc, "", wayX, wayY, WAYPOINTYELLOW, true, true, 0)
+		local waypointID = PlayerObject(pGhost):addWaypoint("dathomir", wayDesc, "", wayX, 0, wayY, WAYPOINT_YELLOW, true, true, 0)
 		writeData(SceneObject(pPlayer):getObjectID() .. ":village:csCommanderWaypoint", waypointID)
 	end
 end

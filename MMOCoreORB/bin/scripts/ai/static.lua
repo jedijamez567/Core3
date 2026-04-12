@@ -3,11 +3,14 @@ idleStatic = {
 	{id="160531963",	name="Sequence",	pid="868845731"},
 	{id="3886503512",	name="If",	pid="160531963"},
 	{id="630408355",	name="CheckMovementState",	pid="3886503512",	args={condition=LEASHING}},
+	{id="325859733",	name="If",	pid="160531963"},
+	{id="626416296",	name="CheckDestination",	pid="325859733",	args={condition=0.0}},
 	{id="3416313250",	name="WriteBlackboard",	pid="160531963",	args={key="moveMode", val=RUN}},
+	{id="1769616369",	name="TreeSocket",	pid="160531963",	args={slot=MOVE}},
 	{id="1385797022",	name="Sequence",	pid="868845731"},
 	{id="2945227650",	name="If",	pid="1385797022"},
 	{id="3999041037",	name="CheckIsHome",	pid="2945227650"},
-	{id="159935104",	name="Wait",	pid="1385797022",	args={duration=-1.0}},
+	{id="159935104",	name="Wait",	pid="1385797022",	args={durationMax=-1.0, durationMin=-1.0}},
 	{id="1372879556",	name="Sequence",	pid="868845731"},
 	{id="2219758424",	name="Not",	pid="1372879556"},
 	{id="287468497",	name="If",	pid="2219758424"},
@@ -37,6 +40,6 @@ wanderStatic = {
 	{id="1411814469",	name="Not",	pid="3910073142"},
 	{id="3866536807",	name="If",	pid="1411814469"},
 	{id="4198924774",	name="CheckIsHome",	pid="3866536807"},
-	{id="737159031",	name="Wait",	pid="3910073142",	args={duration=10.0}}}
+	{id="737159031",	name="Wait",	pid="3910073142",	args={durationMax=10.0, durationMin=5.0}}}
 addAiTemplate("wanderStatic", wanderStatic)
 

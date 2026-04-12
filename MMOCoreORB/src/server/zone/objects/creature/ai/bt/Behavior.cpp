@@ -14,40 +14,61 @@
 
 #ifdef DEBUG_AI
 namespace {
-	static Logger logger("AiAgent::Behavior", Logger::INFO);
-	bool getAiAgentDebugVerbose() {
-		static Mutex mutext;
-		Locker guard(&mutext);
-		static bool cachedValue = false;
-		static int cachedConfigVersion = 0;
-		int currentConfigVersion = ConfigManager::instance()->getConfigVersion();
+static Logger logger("AiAgent::Behavior", Logger::INFO);
+bool getAiAgentDebugVerbose() {
+	static Mutex mutext;
+	Locker guard(&mutext);
+	static bool cachedValue = false;
+	static int cachedConfigVersion = 0;
+	int currentConfigVersion = ConfigManager::instance()->getConfigVersion();
 
-		if (currentConfigVersion > cachedConfigVersion) {
-			cachedConfigVersion = currentConfigVersion;
-			cachedValue = ConfigManager::instance()->getBool("Core3.AiAgent.Verbose", false);
-			logger.info(true) << "Core3.AiAgent.Verbose=" << cachedValue;
-		}
-
-		return cachedValue;
+	if (currentConfigVersion > cachedConfigVersion) {
+		cachedConfigVersion = currentConfigVersion;
+		cachedValue = ConfigManager::instance()->getBool("Core3.AiAgent.Verbose", false);
+		logger.info(true) << "Core3.AiAgent.Verbose=" << cachedValue;
 	}
+
+	return cachedValue;
 }
+} // namespace
 #endif // DEBUG_AI
 
 using namespace server::zone::objects::creature::ai::bt;
 
-Behavior::Behavior(const String& className, const uint32 id, const LuaObject& args)
-	: Object(), className(className), id(id), parent() {}
+Behavior::Behavior(const String& className, const uint32 id, const LuaObject& args) : Object(), className(className), id(id), parent() {
+}
 
 bool Behavior::checkConditions(AiAgent* agent) const {
-	// placeholder for more robust checkConditions
-	return agent != nullptr && !agent->isDead() && !agent->isIncapacitated() && agent->getZone() != nullptr;
+	if (agent == nullptr || (!agent->isPet() && (agent->isDead() || agent->isIncapacitated()))) {
+		return false;
+	}
+
+	auto zone = agent->getZone();
+
+	if (zone == nullptr) {
+		return false;
+	}
+
+	ZoneServer* zoneServer = agent->getZoneServer();
+
+	if (zoneServer == nullptr || zoneServer->isServerLoading())
+		return false;
+
+	if (zoneServer->isServerShuttingDown()) {
+		agent->wipeBlackboard();
+		agent->cancelBehaviorEvent();
+
+		return false;
+	}
+
+	return true;
 }
 
 Behavior::Status Behavior::doAction(AiAgent* agent) const {
 #ifdef DEBUG_AI
-	//agent->info("0x" + String::hexvalueOf((int)id) + " " + print().toCharArray(), true);
 	if (agent->peekBlackboard("aiDebug") && agent->readBlackboard("aiDebug") == true) {
 		StringBuffer msg;
+
 		msg << "0x" << hex << id << " " << print().toCharArray();
 		agent->info(msg.toString(), true);
 
@@ -59,14 +80,8 @@ Behavior::Status Behavior::doAction(AiAgent* agent) const {
 	}
 #endif // DEBUG_AI
 
-	if (!this->checkConditions(agent)) {
-		if (agent != nullptr) {
-			// TODO: Should this be done here or in realizations of specific actions?
-			agent->clearCombatState(true);
-			agent->info() << "Invalid return from " << print() << " in " << agent->getErrorContext();
-		}
-
-		return INVALID; // TODO: should this be FAILURE?
+	if (!checkConditions(agent)) {
+		return INVALID;
 	}
 
 	// Step 1:	check if this behavior is in the running chain
@@ -85,7 +100,6 @@ Behavior::Status Behavior::doAction(AiAgent* agent) const {
 	Behavior::Status result = this->execute(agent);
 
 #ifdef DEBUG_AI
-	//agent->info("0x" + String::hexvalueOf((int)id) + " " + print().toCharArray() + " result: " + result, true);
 	if (agent->peekBlackboard("aiDebug") && agent->readBlackboard("aiDebug") == true) {
 		StringBuffer msg;
 		msg << "0x" << hex << id << " " << print() << " result: " << result;
@@ -98,7 +112,9 @@ Behavior::Status Behavior::doAction(AiAgent* agent) const {
 	//			add this->id to the front. As the chain unwinds, the composite
 	//			parents will push_front to the chain until the root node
 	if (result == RUNNING) {
-		if (!isSocket()) agent->clearRunningChain();
+		if (!isSocket())
+			agent->clearRunningChain();
+
 		agent->addRunningID(id);
 	} else
 		this->end(agent);

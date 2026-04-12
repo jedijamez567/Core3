@@ -80,6 +80,16 @@ void BountyMissionObjectiveImplementation::abort() {
 
 	cancelAllTasks();
 
+	if (activeDroid != nullptr) {
+		if (!activeDroid->isPlayerCreature()) {
+			Locker locker(activeDroid);
+			activeDroid->destroyObjectFromDatabase();
+			activeDroid->destroyObjectFromWorld(true);
+		}
+
+		activeDroid = nullptr;
+	}
+
 	if (strongRef == nullptr)
 		return;
 
@@ -186,7 +196,7 @@ int BountyMissionObjectiveImplementation::notifyObserverEvent(MissionObserver* o
 	} else if (eventType == ObserverEventType::DAMAGERECEIVED) {
 		return handleNpcTargetReceivesDamage(arg1);
 	} else if (eventType == ObserverEventType::PLAYERKILLED) {
-		handlePlayerKilled(arg1);
+		handlePlayerKilled(arg1, arg2);
 	}
 
 	return 0;
@@ -344,13 +354,13 @@ void BountyMissionObjectiveImplementation::cancelAllTasks() {
 		targetTask = nullptr;
 	}
 
-	for (int i = 0; i < droidTasks.size(); i++) {
+	/*for (int i = 0; i < droidTasks.size(); i++) {
 		Reference<Task*> droidTask = droidTasks.get(i);
 
 		if (droidTask != nullptr && droidTask->isScheduled()) {
 			droidTask->cancel();
 		}
-	}
+	}*/
 
 	droidTasks.removeAll();
 }
@@ -569,7 +579,10 @@ int BountyMissionObjectiveImplementation::handleNpcTargetReceivesDamage(ManagedO
 	return 0;
 }
 
-void BountyMissionObjectiveImplementation::handlePlayerKilled(ManagedObject* arg1) {
+void BountyMissionObjectiveImplementation::handlePlayerKilled(ManagedObject* arg1, uint64 destructedID) {
+	if (completedMission)
+		return;
+
 	CreatureObject* creo = cast<CreatureObject*>(arg1);
 
 	if (creo == nullptr)
@@ -582,49 +595,75 @@ void BountyMissionObjectiveImplementation::handlePlayerKilled(ManagedObject* arg
 	else
 		killer = creo;
 
-	ManagedReference<MissionObject* > mission = this->mission.get();
-	ManagedReference<CreatureObject*> owner = getPlayerOwner();
-
-	if(mission == nullptr)
+	if (killer == nullptr)
 		return;
 
-	if (owner != nullptr && killer != nullptr && !completedMission) {
-		if (owner->getObjectID() == killer->getObjectID()) {
-			//Target killed by player, complete mission.
-			ZoneServer* zoneServer = owner->getZoneServer();
-			if (zoneServer != nullptr) {
-				ManagedReference<CreatureObject*> target = zoneServer->getObject(mission->getTargetObjectId()).castTo<CreatureObject*>();
-				if (target != nullptr) {
-					ManagedReference<PlayerManager*> playerManager = owner->getZoneServer()->getPlayerManager();
+	ManagedReference<MissionObject*> mission = this->mission.get();
+	ManagedReference<CreatureObject*> owner = getPlayerOwner();
 
-					int minXpLoss = -playerManager->getJediDeathBountyXpLossMin();
-					int maxXpLoss = -playerManager->getJediDeathBountyXpLossMax();
+	if (mission == nullptr || owner == nullptr)
+		return;
 
-					VisibilityManager::instance()->clearVisibility(target);
-					int rewardCreds = mission->getRewardCredits() + mission->getBonusCredits();
-					int xpLoss = rewardCreds * -playerManager->getJediDeathBountyXpLossCreditsMultiplier();
+	uint64 targetID = mission->getTargetObjectId();
+	uint64 ownerID = owner->getObjectID();
+	uint64 killerID = killer->getObjectID();
 
-					if (xpLoss > minXpLoss)
-						xpLoss = minXpLoss;
-					else if (xpLoss < maxXpLoss)
-						xpLoss = maxXpLoss;
+	// Player died to DoT
+	if (killerID == destructedID)
+		return;
 
-					playerManager->awardExperience(target, "jedi_general", xpLoss, true, 1.0f, playerManager->getApplyGlobalXpMultiplierToJediDeathLoss());
-					StringIdChatParameter message("base_player","prose_revoke_xp");
-					message.setDI(xpLoss * -1);
-					message.setTO("exp_n", "jedi_general");
-					target->sendSystemMessage(message);
-				}
-			}
+	// info(true) << "BountyMissionObjectiveImplementation::handlePlayerKilled -- Owner: " << ownerID << " Killer: " << killerID << " Mission Target ID: " << targetID << " Destructed ID: " << destructedID;
 
-			complete();
-		} else if (mission->getTargetObjectId() == killer->getObjectID() ||
-				(npcTarget != nullptr && npcTarget->getObjectID() == killer->getObjectID())) {
+	// Fail Mission if the target killed the owner
+	if (killerID == targetID && ownerID != killerID) {
+		owner->sendSystemMessage("@mission/mission_generic:failed"); // Mission failed
 
-			owner->sendSystemMessage("@mission/mission_generic:failed"); // Mission failed
+		if (killer->isPlayerCreature())
 			killer->sendSystemMessage("You have defeated a bounty hunter, ruining his mission against you!");
-			fail();
-		}
-	}
-}
 
+		fail();
+
+		return;
+	}
+
+	// Killer must be the mission owner to return succesful
+	if (killerID != ownerID)
+		return;
+
+	// Target killed by player, complete mission.
+	ZoneServer* zoneServer = owner->getZoneServer();
+
+	if (zoneServer == nullptr)
+		return;
+
+	ManagedReference<CreatureObject*> target = zoneServer->getObject(mission->getTargetObjectId()).castTo<CreatureObject*>();
+
+	if (target == nullptr)
+		return;
+
+	auto playerManager = zoneServer->getPlayerManager();
+
+	if (playerManager == nullptr)
+		return;
+
+	int minXpLoss = -playerManager->getJediDeathBountyXpLossMin();
+	int maxXpLoss = -playerManager->getJediDeathBountyXpLossMax();
+
+	VisibilityManager::instance()->clearVisibility(target);
+	int rewardCreds = mission->getRewardCredits() + mission->getBonusCredits();
+	int xpLoss = rewardCreds * -playerManager->getJediDeathBountyXpLossCreditsMultiplier();
+
+	if (xpLoss > minXpLoss)
+		xpLoss = minXpLoss;
+	else if (xpLoss < maxXpLoss)
+		xpLoss = maxXpLoss;
+
+	playerManager->awardExperience(target, "jedi_general", xpLoss, true, 1.0f, playerManager->getApplyGlobalXpMultiplierToJediDeathLoss());
+
+	StringIdChatParameter message("base_player", "prose_revoke_xp");
+	message.setDI(xpLoss * -1);
+	message.setTO("exp_n", "jedi_general");
+	target->sendSystemMessage(message);
+
+	complete();
+}

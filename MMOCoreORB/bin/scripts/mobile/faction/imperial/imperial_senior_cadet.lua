@@ -27,26 +27,11 @@ imperial_senior_cadet = Creature:new {
 	creatureBitmask = PACK,
 	diet = HERBIVORE,
 
-	templates = {
-		"object/mobile/dressed_imperial_officer_f.iff",
-		"object/mobile/dressed_imperial_officer_m.iff",
-		"object/mobile/dressed_imperial_officer_m_2.iff",
-		"object/mobile/dressed_imperial_officer_m_3.iff",
-		"object/mobile/dressed_imperial_officer_m_4.iff",
-		"object/mobile/dressed_imperial_officer_m_5.iff",
-		"object/mobile/dressed_imperial_officer_m_6.iff"},
+	templates = { "imperial_officer" },
 	lootGroups = {
 		{
 			groups = {
-				{group = "color_crystals", chance = 100000},
-				{group = "junk", chance = 4850000},
-				{group = "rifles", chance = 1000000},
-				{group = "pistols", chance = 1000000},
-				{group = "melee_weapons", chance = 1000000},
-				{group = "carbines", chance = 1000000},
-				{group = "clothing_attachments", chance = 25000},
-				{group = "armor_attachments", chance = 25000},
-				{group = "wearables_common", chance = 1000000}
+				{group = "imperial_tier_1", chance = 10000000}
 			},
 			lootChance = 2200000
 		}

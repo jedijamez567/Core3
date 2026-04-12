@@ -386,6 +386,10 @@ namespace conf {
 			return getInt("Core3.MantisPort", 3306);
 		}
 
+		inline const String& getLatestTre() {
+			return getString("Core3.TreManager.LatestTre", "default_patch.tre");
+		}
+
 		inline const Vector<String>& getTreFiles() {
 			return getStringVector("Core3.TreFiles");
 		}
@@ -490,6 +494,10 @@ namespace conf {
 			return getSortedStringVector("Core3.ZonesEnabled");
 		}
 
+		const SortedVector<String>& getEnabledSpaceZones() {
+			return getSortedStringVector("Core3.SpaceZonesEnabled");
+		}
+
 		inline int getPurgeDeletedCharacters() {
 			return getInt("Core3.PurgeDeletedCharacters", 10); // In minutes
 		}
@@ -580,7 +588,14 @@ namespace conf {
 
 			if (configVersion.get() > cachedVersion) {
 				Locker guard(&mutex);
-				cachedSessionStatsSeconds = getInt("Core3.SessionStatsSeconds", 3600);
+				cachedSessionStatsSeconds = getInt("Core3.SessionStatsSeconds", 1800);
+#ifndef WITH_DEV_MODE
+				if (cachedSessionStatsSeconds < 300) {
+					cachedSessionStatsSeconds = 300;
+				} else if (cachedSessionStatsSeconds > 3600) {
+					cachedSessionStatsSeconds = 3600;
+				}
+#endif // !WITH_DEV_MODE
 				cachedVersion = configVersion.get();
 			}
 
@@ -690,6 +705,157 @@ namespace conf {
 			}
 
 			return cachedPvpBroadcastChannel;
+		}
+
+		inline bool useCovertOvertSystem() {
+			static uint32 cachedVersion = 0;
+			static bool cachedCovertOvertSystem;
+
+			if (configVersion.get() > cachedVersion) {
+				Locker guard(&mutex);
+				cachedCovertOvertSystem = getBool("Core3.GCWManager.useCovertOvertSystem", false);
+				cachedVersion = configVersion.get();
+			}
+
+			return cachedCovertOvertSystem;
+		}
+
+		inline bool getLoginEnableSessionId() {
+			static uint32 cachedVersion = 0;
+			static bool cachedEnableSessionId;
+
+			if (configVersion.get() > cachedVersion) {
+				Locker guard(&mutex);
+				cachedEnableSessionId = getBool("Core3.Login.EnableSessionId", false);
+				cachedVersion = configVersion.get();
+			}
+
+			return cachedEnableSessionId;
+		}
+
+		inline int getMinLairSpawnInterval() {
+			static uint32 cachedVersion = 0;
+			static int cachedMinSpawnDelay;
+
+			if (configVersion.get() > cachedVersion) {
+				Locker guard(&mutex);
+				cachedMinSpawnDelay = getInt("Core3.Regions.minimumLairSpawnInterval", 5000);
+				cachedVersion = configVersion.get();
+			}
+
+			return cachedMinSpawnDelay;
+		}
+
+		inline int getMinSpaceSpawnInterval() {
+			static uint32 cachedVersion = 0;
+			static int cachedMinSpaceSpawnDelay;
+
+			if (configVersion.get() > cachedVersion) {
+				Locker guard(&mutex);
+				cachedMinSpaceSpawnDelay = getInt("Core3.Regions.minimumSpaceSpawnInterval", 5000);
+				cachedVersion = configVersion.get();
+			}
+
+			return cachedMinSpaceSpawnDelay;
+		}
+
+		inline bool disableWorldSpawns() {
+			static uint32 cachedVersion = 0;
+			static bool cachedDisableWorldSpawns;
+
+			if (configVersion.get() > cachedVersion) {
+				Locker guard(&mutex);
+				cachedDisableWorldSpawns = getBool("Core3.Regions.DisableWorldSpawns", false);
+				cachedVersion = configVersion.get();
+			}
+
+			return cachedDisableWorldSpawns;
+		}
+
+		inline bool disableSpaceSpawns() {
+			static uint32 cachedVersion = 0;
+			static bool cachedDisableSpaceSpawns;
+
+			if (configVersion.get() > cachedVersion) {
+				Locker guard(&mutex);
+				cachedDisableSpaceSpawns = getBool("Core3.Regions.DisableSpaceSpawns", false);
+				cachedVersion = configVersion.get();
+			}
+
+			return cachedDisableSpaceSpawns;
+		}
+
+		inline float getSpawnCheckRange() {
+			static uint32 cachedVersion = 0;
+			static float cachedSpawnRange;
+
+			if (configVersion.get() > cachedVersion) {
+				Locker guard(&mutex);
+				cachedSpawnRange = getFloat("Core3.Regions.spawnCheckRange", 64.f);
+				cachedVersion = configVersion.get();
+			}
+
+			return cachedSpawnRange;
+		}
+
+		inline float getSpaceSpawnCheckRange() {
+			static uint32 cachedVersion = 0;
+			static float cachedSpaceSpawnRange;
+
+			if (configVersion.get() > cachedVersion) {
+				Locker guard(&mutex);
+				cachedSpaceSpawnRange = getFloat("Core3.Regions.spaceSpawnCheckRange", 1024.f);
+				cachedVersion = configVersion.get();
+			}
+
+			return cachedSpaceSpawnRange;
+		}
+
+		inline bool getLootDebugAttributes() {
+			static uint32 cachedVersion = 0;
+			static bool cachedValue;
+
+			if (configVersion.get() > cachedVersion) {
+				Locker guard(&mutex);
+				cachedValue = getBool("Core3.LootManager.DebugAttributes", false);
+				cachedVersion = configVersion.get();
+			}
+
+			return cachedValue;
+		}
+
+
+		/*
+
+			JTL Configs
+
+		*/
+
+
+		inline bool isJtlEnabled() {
+			static uint32 cachedVersion = 0;
+			static bool cachedJtlEnabled;
+
+			if (configVersion.get() > cachedVersion) {
+				Locker guard(&mutex);
+				cachedJtlEnabled = getBool("Core3.JTL.JTLEnabled", false);
+				cachedVersion = configVersion.get();
+			}
+
+			return cachedJtlEnabled;
+		}
+
+		inline bool launchFromDevice() {
+			static uint32 cachedVersion = 0;
+			static bool cachedLaunchFromDevice;
+
+			if (configVersion.get() > cachedVersion) {
+				Locker guard(&mutex);
+				cachedLaunchFromDevice = getBool("Core3.JTL.LaunchFromDevice", false);
+				cachedVersion = configVersion.get();
+			}
+
+			return cachedLaunchFromDevice;
 		}
 	};
 }

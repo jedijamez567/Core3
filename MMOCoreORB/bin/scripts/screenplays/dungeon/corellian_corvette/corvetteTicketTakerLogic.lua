@@ -29,7 +29,7 @@ function CorvetteTicketTakerLogic:spawnNpc()
 
 	if pNpc ~= nil then
 		if (npcSpawnData.position == SIT) then
-			CreatureObject(pNpc):setState(STATESITTINGONCHAIR)
+			CreatureObject(pNpc):setState(SITTINGONCHAIR)
 		end
 		if (npcSpawnData.mood ~= nil and npcSpawnData.mood ~= "") then
 			CreatureObject(pNpc):setMoodString(npcSpawnData.mood)
@@ -42,8 +42,16 @@ function CorvetteTicketTakerLogic:checkFaction(pPlayer)
 		return true
 	end
 
-	if (not ThemeParkLogic:isInFaction(self.faction, pPlayer) or ThemeParkLogic:isOnLeave(pPlayer) or TangibleObject(pPlayer):isChangingFactionStatus()) then
-		return false
+	local covertOvert = useCovertOvert()
+
+	if (covertOvert) then
+		if (not ThemeParkLogic:isInFaction(self.faction, pPlayer) or not CreatureObject(pPlayer):isOvert() or TangibleObject(pPlayer):isChangingFactionStatus()) then
+			return false
+		end
+	else
+		if (not ThemeParkLogic:isInFaction(self.faction, pPlayer) or ThemeParkLogic:isOnLeave(pPlayer) or TangibleObject(pPlayer):isChangingFactionStatus()) then
+			return false
+		end
 	end
 
 	if (CreatureObject(pPlayer):isGrouped()) then
@@ -51,8 +59,16 @@ function CorvetteTicketTakerLogic:checkFaction(pPlayer)
 
 		for i = 0, groupSize - 1, 1 do
 			local pMember = CreatureObject(pPlayer):getGroupMember(i)
-			if pMember ~= nil and (not ThemeParkLogic:isInFaction(self.faction, pMember) or ThemeParkLogic:isOnLeave(pMember) or TangibleObject(pMember):isChangingFactionStatus()) then
-				return false
+			if pMember ~= nil then
+				if (covertOvert) then
+					if ((not ThemeParkLogic:isInFaction(self.faction, pMember)) or not CreatureObject(pMember):isOvert() or TangibleObject(pMember):isChangingFactionStatus()) then
+						return false
+					end
+				else
+					if ((not ThemeParkLogic:isInFaction(self.faction, pMember) or ThemeParkLogic:isOnLeave(pMember) or TangibleObject(pMember):isChangingFactionStatus())) then
+						return false
+					end
+				end
 			end
 		end
 	end
@@ -80,6 +96,7 @@ function CorvetteTicketTakerLogic:finishValidateTicket(pPlayer)
 	local player = CreatureObject(pPlayer)
 
 	local pInventory = player:getSlottedObject("inventory")
+
 	if pInventory == nil or not factionCheck then
 		player:sendSystemMessageWithTO("@dungeon/space_dungeon:no_ticket", "@dungeon/space_dungeon:corvette_" .. self:getFactionString()) -- You do not have the proper authorization to access the %TO.
 		return

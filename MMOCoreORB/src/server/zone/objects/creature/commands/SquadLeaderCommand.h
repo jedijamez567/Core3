@@ -57,6 +57,11 @@ public:
 	}
 
 	static bool isValidGroupAbilityTarget(CreatureObject* leader, CreatureObject* target, bool allowPet) {
+
+		if (target == nullptr || target->isDead() || target->isIncapacitated()) {
+			return false;
+		}
+
 		if (allowPet) {
 			if (!target->isPlayerCreature() && !target->isPet()) {
 				return false;
@@ -73,27 +78,16 @@ public:
 
 		CreatureObject* targetCreo = target;
 
-		if (allowPet && target->isPet())
+		if (allowPet && target->isPet()) {
 			targetCreo = target->getLinkedCreature().get();
 
-		PlayerObject* ghost = targetCreo->getPlayerObject();
-		if (ghost == nullptr || ghost->hasBhTef())
-			return false;
-
-		uint32 leaderFaction = leader->getFaction();
-		uint32 targetFaction = target->getFaction();
-		int targetStatus = targetCreo->getFactionStatus();
-
-		if (leaderFaction == 0) {
-			if (targetFaction != 0 && targetStatus > FactionStatus::ONLEAVE)
-				return false;
-		} else if (targetFaction != 0) {
-			if (leaderFaction != targetFaction && targetStatus > FactionStatus::ONLEAVE)
-				return false;
-
-			if (leaderFaction == targetFaction && targetStatus > leader->getFactionStatus())
+			if (targetCreo == nullptr)
 				return false;
 		}
+
+		// Use healing checks
+		if (!targetCreo->isHealableBy(leader))
+			return false;
 
 		if (target->getParentRecursively(SceneObjectType::BUILDING) != leader->getParentRecursively(SceneObjectType::BUILDING))
 			return false;

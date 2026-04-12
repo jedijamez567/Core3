@@ -8,6 +8,7 @@
 #include "server/zone/managers/stringid/StringIdManager.h"
 #include "server/zone/managers/collision/CollisionManager.h"
 #include "server/zone/managers/frs/FrsManager.h"
+#include "server/zone/objects/player/FactionStatus.h"
 
 ForceHealQueueCommand::ForceHealQueueCommand(const String& name, ZoneProcessServer* server) : JediQueueCommand(name, server) {
 	speed = 3;
@@ -256,6 +257,10 @@ int ForceHealQueueCommand::runCommand(CreatureObject* creature, CreatureObject* 
 		}
 
 		VisibilityManager::instance()->increaseVisibility(creature, visMod);
+
+		if (!selfHeal)
+			checkForTef(creature, targetCreature);
+
 		return SUCCESS;
 	} else {
 		if (selfHeal) {

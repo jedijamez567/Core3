@@ -38,6 +38,8 @@ includeFile("themepark/conversations/nym_conv_handler.lua")
 includeFile("themepark/conversations/theater_manager_conv_handler.lua")
 includeFile("themepark/conversations/audience_member_conv_handler.lua")
 includeFile("themepark/conversations/record_keeper_conv_handler.lua")
+includeFile("themepark/helper_droid/helper_droid.lua")
+includeFile("themepark/helper_droid/helper_droid_quest.lua")
 includeFile("themepark/imperial/themeParkImperial.lua")
 includeFile("themepark/imperial/emperors_retreat.lua")
 includeFile("themepark/nym/themeParkNym.lua")
@@ -303,6 +305,7 @@ includeFile("events/bestine_election/convos/tour_aryon_conv_handler.lua")
 -- Cries of Alderaan
 includeFile("events/coa/coa.lua")
 includeFile("events/coa/coa2Screenplay.lua")
+includeFile("events/coa/coa3Screenplay.lua")
 includeFile("events/coa/conversations/imperial_commander_conv_handler.lua")
 includeFile("events/coa/conversations/imperial_coordinator_conv_handler.lua")
 includeFile("events/coa/conversations/imperial_informant_conv_handler.lua")
@@ -310,6 +313,24 @@ includeFile("events/coa/conversations/rebel_commander_conv_handler.lua")
 includeFile("events/coa/conversations/rebel_coordinator_conv_handler.lua")
 includeFile("events/coa/conversations/rebel_lyda_conv_handler.lua")
 includeFile("events/coa/conversations/rebel_sympathizer_conv_handler.lua")
+includeFile("events/coa/conversations/coa3_info_officer_conv_handler.lua")
+includeFile("events/coa/conversations/coa3_lookout_conv_handler.lua")
+includeFile("events/coa/conversations/coa3_caravan_leader_conv_handler.lua")
+includeFile("events/coa/conversations/coa3_tact_officer_conv_handler.lua")
+includeFile("events/coa/conversations/coa3_leia_conv_handler.lua")
+includeFile("events/coa/conversations/coa3_veers_conv_handler.lua")
+includeFile("events/coa/components/grav_unit_repair_kit_menu_component.lua")
+includeFile("events/coa/components/coa3_container_component.lua")
+includeFile("events/coa/components/coa3DestroyFacilityMenuComponent.lua")
+
+-- Secrets of the Syren
+includeFile("events/syren/syren.lua")
+includeFile("events/syren/conversations/imperial_jevan_monsul_conv_handler.lua")
+includeFile("events/syren/conversations/neutral_tyla_jinn_conv_handler.lua")
+includeFile("events/syren/conversations/rebel_veega_madish_conv_handler.lua")
+includeFile("events/syren/conversations/doctor_edvar_vang_conv_handler.lua")
+includeFile("events/syren/conversations/kaila_min_conv_handler.lua")
+includeFile("events/syren/conversations/tovar_blackmoor_conv_handler.lua")
 
 -- Events
 includeFile("events/conversations/bestine_artist_conv_handler.lua")
@@ -338,6 +359,32 @@ includeFile("tasks/hero_of_tatooine/conversations/heroOfTatRanchersWifeConvoHand
 includeFile("tasks/hero_of_tatooine/heroOfTatooine.lua")
 includeFile("tasks/hero_of_tatooine/heroOfTatooineContainerComponents.lua")
 includeFile("tasks/hero_of_tatooine/heroOfTatooineMenuComponents.lua")
+
+-- Darndroid Quests
+includeFile("tasks/darndroid/conversations/amarentConvoHandler.lua")
+includeFile("tasks/darndroid/conversations/c3tcConvoHandler.lua")
+includeFile("tasks/darndroid/conversations/selanConvoHandler.lua")
+includeFile("tasks/darndroid/conversations/valanceConvoHandler.lua")
+includeFile("tasks/darndroid/darndroid1.lua")
+includeFile("tasks/darndroid/darndroid2.lua")
+
+-- Safety Measures Quests
+includeFile("tasks/safety_measures/safety_measures.lua")
+includeFile("tasks/safety_measures/conversations/gerak_vurtimis_conv_handler.lua")
+
+-- Enough Quests
+includeFile("tasks/enough/enough_quest.lua")
+includeFile("tasks/enough/conversations/AcunSolariConvoHandler.lua")
+includeFile("tasks/enough/conversations/CethLaikeConvoHandler.lua")
+
+-- Defector Quests
+includeFile("tasks/defector_quests/defector_quest.lua")
+includeFile("tasks/defector_quests/conversations/JomIrimoreConvoHandler.lua")
+includeFile("tasks/defector_quests/conversations/TesloTendooraConvoHandler.lua")
+includeFile("tasks/defector_quests/conversations/ImperialDefectorConvoHandler.lua")
+includeFile("tasks/defector_quests/conversations/JaekVercetConvoHandler.lua")
+includeFile("tasks/defector_quests/conversations/AllardLissaraConvoHandler.lua")
+includeFile("tasks/defector_quests/conversations/RebelDefectorConvoHandler.lua")
 
 -- Task/Quest
 includeFile("tasks/corellia/blk_sun_tasks.lua")
@@ -535,6 +582,10 @@ includeFile("caves/tatooine_sennex_cave.lua")
 includeFile("caves/tatooine_squill_cave.lua")
 includeFile("caves/tatooine_tusken_bunker.lua")
 
+-- Cantinas
+includeFile("cities/cantinas/bartenders.lua")
+includeFile("cities/cantinas/bartender_conv_handler.lua")
+
 -- Cities
 includeFile("cities/city.lua")
 includeFile("cities/corellia_bela_vistal.lua")
@@ -661,7 +712,10 @@ includeFile("treasure_map/TreasureMapMenuComponent.lua")
 includeFile("racetracks/racetracks.lua")
 
 --Space
-includeFile("space/space_chassis_dealer_conv_handler.lua")
+includeFile("space/screenplays.lua")
+
+--Spawner
+includeFile("spawner/screenplays.lua")
 
 --Record Keepers
 includeFile("record_keepers/record_keepers.lua")
@@ -671,6 +725,7 @@ includeFile("battlefields/battlefield_spawner.lua");
 
 --Tests
 includeFile("tests/tests.lua")
+includeFile("tests/ai_test.lua")
 
 -- Server Event Automation
 includeFile("events/ServerEventAutomation.lua")

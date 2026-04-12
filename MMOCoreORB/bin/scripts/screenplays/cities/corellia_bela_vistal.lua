@@ -73,7 +73,7 @@ CorelliaBelaVistalScreenPlay = CityScreenPlay:new {
 
 		npc_1 = {{6846, 315, -5588, 0, true}, {6847, 315, -5617, 0, true}, {6808, 315, -5616, 0, false}, {6830, 315, -5599, 0, true}, {6833.8, 315, -5580.4, 0, true}},
 		npc_2 = {{6829, 315, -5745, 0, false}, {6818, 314, -5620, 0, false}, {6779, 314, -5620, 0, true}, {6818, 314, -5620, 0, true}},
-		npc_3 = {{6755, 314, -5625, 0, false}, {6731, 315, -5588, 0, true}, {6702, 315, -5583, 0, true}, {6699, 315, -5567, 0, true}, {6723, 315, -5567, 0, false}, {6731, 315, 0, true}},
+		npc_3 = {{6755, 314, -5625, 0, false}, {6731, 315, -5588, 0, true}, {6702, 315, -5583, 0, true}, {6699, 315, -5567, 0, true}, {6723, 315, -5567, 0, false}, {6731, 315, -5574, 0, true}},
 		npc_4 = {{6740, 315, -5674, 0, true}, {6742, 315, -5697, 0, true}, {6714, 315, -5692, 0, false}, {6742, 315, -5697, 0, true}},
 		npc_5 = {{6761, 315, -5695, 0, true}, {6761, 315, -5731, 0, true}, {6795, 315, -5732, 0, true}, {6761, 315, -5731, 0, true}},
 		npc_6 = {{6829, 315, -5745, 0, true}, {6828, 315, -5799, 0, true}},
@@ -159,7 +159,6 @@ CorelliaBelaVistalScreenPlay = CityScreenPlay:new {
 		{"trainer_scout", 0, 6737.85, 315, -5491.3, 31, 0, ""},
 		{"trainer_scout",  0, 6724, 315, -5682, 0, 0, ""},
 
-		{"bartender",60,8.54,-0.894992,0.14,87.0026,3375355, "neutral"},
 		{"businessman",60,-6.56842,-0.894996,21.9012,135.001,3375361, "conversation"},
 		{"contractor",60,-5.46842,-0.894996,21.9012,180.003,3375361, "conversation"},
 		{"bounty_hunter",60,21.6023,-0.894996,-18.5913,360.011,3375356, "conversation"},
@@ -206,7 +205,7 @@ function CorelliaBelaVistalScreenPlay:spawnMobiles()
 				CreatureObject(pMobile):setMoodString(mob[8])
 			end
 
-			AiAgent(pMobile):addCreatureFlag(AI_STATIC)
+			AiAgent(pMobile):addObjectFlag(AI_STATIC)
 
 			if CreatureObject(pMobile):getPvpStatusBitmask() == 0 then
 				CreatureObject(pMobile):clearOptionBit(AIENABLED)

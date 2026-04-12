@@ -19,7 +19,9 @@ int CreatureTemplateManager::ERROR_CODE = NO_ERROR;
 CreatureTemplateManager::CreatureTemplateManager() : Logger("CreatureTemplateManager") {
 	/*setLogging(false);
 		setGlobalLogging(true);*/
-	//setLoggingName("CreatureTemplateManager");
+
+	setLoggingName("CreatureTemplateManager");
+
 	globalAttackSpeedOverride = 0.0f;
 
 	lua = new Lua();
@@ -43,15 +45,15 @@ CreatureTemplateManager::CreatureTemplateManager() : Logger("CreatureTemplateMan
 	lua->registerFunction("addOutfitGroup", addOutfitGroup);
 	lua->registerFunction("addDressGroup", addDressGroup);
 
-	lua->setGlobalInt("NONE", CreatureFlag::NONE);
-	lua->setGlobalInt("ATTACKABLE", CreatureFlag::ATTACKABLE);
-	lua->setGlobalInt("AGGRESSIVE", CreatureFlag::AGGRESSIVE);
-	lua->setGlobalInt("OVERT", CreatureFlag::OVERT);
-	lua->setGlobalInt("TEF", CreatureFlag::TEF);
-	lua->setGlobalInt("PLAYER", CreatureFlag::PLAYER);
-	lua->setGlobalInt("ENEMY", CreatureFlag::ENEMY);
-	lua->setGlobalInt("WILLBEDECLARED", CreatureFlag::WILLBEDECLARED);
-	lua->setGlobalInt("WASDECLARED", CreatureFlag::WASDECLARED);
+	lua->setGlobalInt("NONE", ObjectFlag::NONE);
+	lua->setGlobalInt("ATTACKABLE", ObjectFlag::ATTACKABLE);
+	lua->setGlobalInt("AGGRESSIVE", ObjectFlag::AGGRESSIVE);
+	lua->setGlobalInt("OVERT", ObjectFlag::OVERT);
+	lua->setGlobalInt("TEF", ObjectFlag::TEF);
+	lua->setGlobalInt("PLAYER", ObjectFlag::PLAYER);
+	lua->setGlobalInt("ENEMY", ObjectFlag::ENEMY);
+	lua->setGlobalInt("WILLBEDECLARED", ObjectFlag::WILLBEDECLARED);
+	lua->setGlobalInt("WASDECLARED", ObjectFlag::WASDECLARED);
 
 	lua->setGlobalInt("CONVERSABLE", OptionBitmask::CONVERSE);
 	lua->setGlobalInt("AIENABLED", OptionBitmask::AIENABLED);
@@ -60,16 +62,18 @@ CreatureTemplateManager::CreatureTemplateManager() : Logger("CreatureTemplateMan
 	lua->setGlobalInt("INTERESTING", OptionBitmask::INTERESTING);
 	lua->setGlobalInt("JTLINTERESTING", OptionBitmask::JTLINTERESTING);
 
-	lua->setGlobalInt("PACK", CreatureFlag::PACK);
-	lua->setGlobalInt("HERD", CreatureFlag::HERD);
-	lua->setGlobalInt("KILLER", CreatureFlag::KILLER);
-	lua->setGlobalInt("STALKER", CreatureFlag::STALKER);
-	lua->setGlobalInt("BABY", CreatureFlag::BABY);
-	lua->setGlobalInt("LAIR", CreatureFlag::LAIR);
-	lua->setGlobalInt("HEALER", CreatureFlag::HEALER);
+	lua->setGlobalInt("PACK", ObjectFlag::PACK);
+	lua->setGlobalInt("HERD", ObjectFlag::HERD);
+	lua->setGlobalInt("KILLER", ObjectFlag::KILLER);
+	lua->setGlobalInt("STALKER", ObjectFlag::STALKER);
+	lua->setGlobalInt("BABY", ObjectFlag::BABY);
+	lua->setGlobalInt("LAIR", ObjectFlag::LAIR);
+	lua->setGlobalInt("HEALER", ObjectFlag::HEALER);
+	lua->setGlobalInt("NOINTIMIDATE", ObjectFlag::NOINTIMIDATE);
+	lua->setGlobalInt("NODOT", ObjectFlag::NODOT);
 
-	lua->setGlobalInt("CARNIVORE", CreatureFlag::CARNIVORE);
-	lua->setGlobalInt("HERBIVORE", CreatureFlag::HERBIVORE);
+	lua->setGlobalInt("CARNIVORE", ObjectFlag::CARNIVORE);
+	lua->setGlobalInt("HERBIVORE", ObjectFlag::HERBIVORE);
 
 	// NameManager Types
 	lua->setGlobalInt("NAME_TAG", NameManagerType::TAG);
@@ -87,6 +91,7 @@ CreatureTemplateManager::CreatureTemplateManager() : Logger("CreatureTemplateMan
 	lua->setGlobalInt("NAME_SCOUTTROOPER", NameManagerType::SCOUTTROOPER);
 	lua->setGlobalInt("NAME_DARKTROOPER", NameManagerType::DARKTROOPER);
 	lua->setGlobalInt("NAME_SWAMPTROOPER", NameManagerType::SWAMPTROOPER);
+	lua->setGlobalInt("NAME_TIEPILOT", NameManagerType::TIEPILOT);
 
 	lua->setGlobalInt("MOB_HERBIVORE", AiAgent::MOB_HERBIVORE);
 	lua->setGlobalInt("MOB_CARNIVORE", AiAgent::MOB_CARNIVORE);
@@ -296,13 +301,17 @@ int CreatureTemplateManager::addWeapon(lua_State* L) {
 
 int CreatureTemplateManager::addSpawnGroup(lua_State* L) {
 	if (checkArgumentCount(L, 2) == 1) {
-		instance()->error("incorrect number of arguments passed to CreatureTemplateManager::addLairGroup");
+		instance()->error("incorrect number of arguments passed to CreatureTemplateManager::addSpawnGroup");
 		ERROR_CODE = INCORRECT_ARGUMENTS;
 		return 0;
 	}
 
 	String ascii = lua_tostring(L, -2);
 	uint32 crc = (uint32) ascii.hashCode();
+
+#ifdef DEBUG_REGIONS
+	Logger::console.info(true) << "Adding spawn group: " << ascii;
+#endif // DEBUG_REGIONS
 
 	LuaObject obj(L);
 	CreatureTemplateManager::instance()->spawnGroupMap.put(crc, new SpawnGroup(ascii, obj));

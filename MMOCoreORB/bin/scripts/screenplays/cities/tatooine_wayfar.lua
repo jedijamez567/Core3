@@ -54,7 +54,7 @@ TatooineWayfarScreenPlay = CityScreenPlay:new {
 		npc_1 = {{-5128, 75, -6542, 0, true}, {-5140, 75, -6548, 0, true}, {-5123, 75, -6546, 0, true}, {-5115, 75, -6537, 0, true}, {-5146, 75, -6540, 0, true}},
 		npc_2 = {{-5120, 75, -6594, 0, true}, {-5129, 75, -6609, 0, true}, {-5147, 75, -6614, 0, true}, {-5126, 75, -6606, 0, true}},
 		npc_3 = {{-5176, 75, -6611, 0, true}, {-5156, 75, -6603, 0, true}, {-5195, 75, -6607, 0, true}, {-5176, 75, -6619, 0, true}},
-		npc_4 = {{-5277, 75, -6558, 0, true}, {-5273, 75, -6775, 0, true}, {-5281, 75, -6547, 0, true}, {-5285, 75, -6565, 0, true}},
+		npc_4 = {{-5277, 75, -6558, 0, true}, {-5273, 75, -6575, 0, true}, {-5281, 75, -6547, 0, true}, {-5285, 75, -6565, 0, true}},
 		npc_5 = {{-5113, 75, -6550, 0, false}, {-5109, 75, -6579, 0, true}, {-5080, 75, -6579, 0, true}, {-5109, 75, -6579, 0, true}},
 		npc_6 = {{-5115, 75, -6548, 0, true}, {-5113, 75, -6598, 0, true}},
 		npc_7 = {{-5050, 75, -6570, 0, false}, {-5074, 75, -6545, 0, false}, {-5085, 75, -6535, 0, false}, {-5088, 75, -6509, 0, false}},
@@ -78,7 +78,7 @@ TatooineWayfarScreenPlay = CityScreenPlay:new {
 		{"info_broker",60,4.7,1.0,4.6,-148,1499418, "sad"},
 		{"entertainer",60,6.82411,0.40827,-8.7422,0,1499419, "conversation"},
 		{"brawler",300,6.82411,0.408269,-7.6422,180,1499419, "angry"},
-		{"commoner_technician",60,5.72411,0.408269,-7.6422,135.001,1499419, "conversation"},
+		{"commoner_technician",300,5.72411,0.408269,-7.6422,135.001,1499419, "conversation"},
 		{"trainer_medic",0,-8.4035,1.00421,8.19643,110,1499420, ""},
 		{"brawler",300,-7.85116,-3.96617,6.43429,272.53,1499424, ""},
 		{"devaronian_male",60,-2.4,0.4,-10.1,176,1499419, "neutral"},
@@ -98,7 +98,6 @@ TatooineWayfarScreenPlay = CityScreenPlay:new {
 		{"artisan",60,34.4931,0.104999,-6.47601,180,1134559, "conversation"},
 		{"bounty_hunter",300,34.4931,0.104999,-7.576,0,1134559, "sad"},
 		{"artisan",60,-3.85346,-0.894991,6.73775,0,1134560, "conversation"},
-		{"bartender",60,-11.0018,-0.894992,1.78678,213.433,1134560, ""},
 		{"businessman",60,4.86041,-0.894992,6.38401,249.175,1134560, ""},
 		{"noble",60,-5.69909,-0.894992,-10.4035,79.4873,1134560, ""},
 		{"osweri_hepa",60,11.3838,-0.894992,-2.63465,180.006,1134560, "conversation"},
@@ -115,7 +114,7 @@ TatooineWayfarScreenPlay = CityScreenPlay:new {
 		{"mercenary",300,-25.6591,-0.519991,10.6171,15.7251,1134570, ""},
 
 		{"rebel_recruiter",60,-5295.7,75,-6527.99,39.2298,0, ""},
-		{"smuggler_pilot",60,-5868.38,90,-6199.5,65.5014,0, "neutral"},
+		--{"smuggler_pilot",60,-5868.38,90,-6199.5,65.5014,0, "neutral"},
 		{"trainer_artisan",0,-5274,75,-6547,139,0, ""},
 		{"trainer_commando",0,-5038,75,-6609,226,0, ""},
 		{"trainer_scout",0,-5051.46,75,-6629.48,7,0, ""},
@@ -157,7 +156,7 @@ function TatooineWayfarScreenPlay:spawnMobiles()
 				CreatureObject(pMobile):setMoodString(mob[8])
 			end
 
-			AiAgent(pMobile):addCreatureFlag(AI_STATIC)
+			AiAgent(pMobile):addObjectFlag(AI_STATIC)
 
 			if CreatureObject(pMobile):getPvpStatusBitmask() == 0 then
 				CreatureObject(pMobile):clearOptionBit(AIENABLED)

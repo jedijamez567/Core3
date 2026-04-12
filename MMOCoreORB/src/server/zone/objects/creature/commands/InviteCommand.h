@@ -14,39 +14,38 @@
 class InviteCommand : public QueueCommand {
 public:
 
-	InviteCommand(const String& name, ZoneProcessServer* server)
-		: QueueCommand(name, server) {
-
+	InviteCommand(const String& name, ZoneProcessServer* server) : QueueCommand(name, server) {
 	}
 
 	int doQueueCommand(CreatureObject* creature, const uint64& target, const UnicodeString& arguments) const {
-
 		if (!checkStateMask(creature))
 			return INVALIDSTATE;
 
 		if (!checkInvalidLocomotions(creature))
 			return INVALIDLOCOMOTION;
 
-		auto playerObject = creature->getPlayerObject();
+		auto ghost = creature->getPlayerObject();
 		bool godMode = false;
 
-		if (playerObject) {
-			if (playerObject->hasGodMode())
-				godMode = true;
+		if (ghost != nullptr && ghost->isPrivileged()) {
+			godMode = true;
 		}
 
-		auto object = server->getZoneServer()->getObject(target);
+		auto zoneServer = server->getZoneServer();
+
+		if (zoneServer == nullptr)
+			return GENERALERROR;
+
+		auto object = zoneServer->getObject(target);
 
 		bool galaxyWide = ConfigManager::instance()->getBool("Core3.PlayerManager.GalaxyWideGrouping", false);
 
-		if (galaxyWide && (object == nullptr || !object->isPlayerCreature())) {
+		if (galaxyWide && (object == nullptr || (!object->isPlayerCreature() && !object->isShipObject()))) {
 			StringTokenizer args(arguments.toString());
 			String firstName;
 
 			if (args.hasMoreTokens())
 				args.getStringToken(firstName);
-
-			auto zoneServer = server->getZoneServer();
 
 			if (zoneServer == nullptr)
 				return GENERALERROR;
@@ -64,13 +63,35 @@ public:
 		if (object == nullptr || groupManager == nullptr)
 			return GENERALERROR;
 
-
-		if (object->isPlayerCreature()) {
-			auto player = cast<CreatureObject*>( object.get());
-
-		if (player != nullptr && (!player->getPlayerObject()->isIgnoring(creature->getFirstName()) || godMode))
-			groupManager->inviteToGroup(creature, player);
+		if (!object->isPlayerCreature() && !object->isShipObject()) {
+			return GENERALERROR;
 		}
+
+		CreatureObject* player = nullptr;
+
+		if (object->isShipObject()) {
+			auto ship = object->asShipObject();
+
+			if (ship != nullptr) {
+				player = ship->getOwner().get();
+			}
+		} else {
+			player = object->asCreatureObject();
+		}
+
+		if (player == nullptr)
+			return GENERALERROR;
+
+		auto invitedGhost = player->getPlayerObject();
+
+		if (invitedGhost == nullptr)
+			return GENERALERROR;
+
+		// Cannot be invite by a player that they ignore, does not apply to privileged players
+		if (!godMode && invitedGhost->isIgnoring(creature->getFirstName()))
+			return GENERALERROR;
+
+		groupManager->inviteToGroup(creature, player);
 
 		return SUCCESS;
 	}

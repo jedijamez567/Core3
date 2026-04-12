@@ -109,9 +109,7 @@ class ManufactureSchematic extends IntangibleObject {
 		permissions.clearDenyPermission("owner", ContainerPermissions.MOVECONTAINER);
 	}
 
-	public void initializeTransientMembers() {
-		super.initializeTransientMembers();
-	}
+	public native void initializeTransientMembers();
 
 	public abstract native void destroyObjectFromDatabase(boolean destroyContainedObjects = false);
 

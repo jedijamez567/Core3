@@ -23,7 +23,7 @@ include server.zone.objects.creature.variables.CooldownTimerMap;
 include server.zone.objects.creature.buffs.BuffList;
 include server.zone.objects.creature.damageovertime.DamageOverTimeList;
 include server.zone.objects.scene.variables.DeltaVector;
-include server.zone.objects.creature.variables.CommandQueueActionVector;
+include server.zone.objects.scene.variables.DeltaSet;
 include server.zone.objects.creature.variables.SkillList;
 include server.zone.objects.creature.variables.SkillModList;
 include templates.params.creature.CreaturePosture;
@@ -41,10 +41,13 @@ include system.util.SortedVector;
 include system.lang.ref.WeakReference;
 include engine.log.Logger;
 include server.zone.CloseObjectsVector;
-include server.zone.QuadTreeEntry;
+include server.zone.TreeEntry;
 import system.util.SynchronizedVectorMap;
 import server.zone.managers.auction.AuctionSearchTask;
 import server.zone.objects.tangible.Instrument;
+include server.zone.objects.creature.CommandQueue;
+include server.zone.objects.ship.ShipObject;
+include system.lang.String;
 
 @mock
 @json
@@ -53,9 +56,9 @@ class CreatureObject extends TangibleObject {
 	@dereferenced
 	protected transient WeakReference owner;
 
-    	protected CreditObject creditObject;
+	protected CreditObject creditObject;
 
-    	// deprectated
+	// deprectated
 	protected int bankCredits;
 	protected int cashCredits;
 
@@ -100,7 +103,7 @@ class CreatureObject extends TangibleObject {
 	protected float runSpeed;
 	protected float walkSpeed;
 	protected float currentSpeed;
-	protected float terrainNegotiation;
+	protected float waterModPercent;
 	protected float runAcceleration;
 	protected float walkAcceleration;
 	protected float height;
@@ -134,6 +137,15 @@ class CreatureObject extends TangibleObject {
 	@dereferenced
 	protected DeltaVector<int> maxHamList;
 
+	@dereferenced
+	protected transient DeltaSet<unsigned long, unsigned long> spaceMissionObjects;
+
+	@dereferenced
+	private transient Mutex missionRangeObjectsMutex;
+
+	@dereferenced
+	protected transient SortedVector<unsigned long> missionRangeObjects;
+
 	protected byte frozen;
 
 	protected string templateString;
@@ -148,28 +160,19 @@ class CreatureObject extends TangibleObject {
 	@dereferenced
 	protected transient ReadWriteLock skillModMutex;
 
-	@transactional
-	protected transient CommandQueueActionVector commandQueue;
-
-	@transactional
-	protected transient CommandQueueActionVector immediateQueue;
+	protected transient CommandQueue commandQueue;
 
 	protected transient unsigned int lastActionCounter;
 
 	@dereferenced
 	protected Time nextAction;
 
-	@dereferenced
-	protected Time nextImmediateAction;
-
-	@dereferenced
-	protected Time removeAction;
-
 	@transactional
 	protected transient CooldownTimerMap cooldownTimerMap;
 
 	@dereferenced
 	protected BuffList creatureBuffs;
+
 	@dereferenced
 	protected DamageOverTimeList damageOverTimeList;
 
@@ -203,15 +206,20 @@ class CreatureObject extends TangibleObject {
 	protected transient Time lastCombatActionTime;
 
 	@dereferenced
+	protected transient Time nextAllowedMoveTime;
+
+	@dereferenced
 	protected transient Vector3 lastCombatPosition;
 
 	protected transient string alternateAppearance;
+
+	protected transient unsigned long spawnerID;
 
 	public static final int HUMAN = 0;
 	public static final int RODIAN = 1;
 	public static final int TRANDOSHAN = 2;
 	public static final int MONCAL = 3;
-	public static final int WOOKIE = 4;
+	public static final int WOOKIEE = 4;
 	public static final int BOTHAN = 5;
 	public static final int TWILEK = 6;
 	public static final int ZABRAK = 7;
@@ -226,6 +234,10 @@ class CreatureObject extends TangibleObject {
 	public static transient float DEFAULTRUNSPEED;
 
 	public static final unsigned long DEAD_TOO_LONG = 1800000; //30 minutes - How long can someone be dead and still be resuscitated in Miliseconds
+
+	public transient unsigned long tradeTargetID;
+
+	public static final int CONVERSATION_MAX_DISTANCE = 7; // Max range for conversations
 
 	/**
 	 * CreatureObject constructor, used to initialized the object
@@ -263,10 +275,7 @@ class CreatureObject extends TangibleObject {
 	public native void initializeTransientMembers();
 
 	@preLocked
-	public abstract void setCountdownTimer(unsigned int newCount, boolean notifyClient = true) {
-		super.setCountdownTimer(newCount, notifyClient);
-		cooldownTimerMap.updateToCurrentAndAddMili("incapTimer", getUseCount()*1000);
-	}
+	public native void setIncapacitationTimer(unsigned int newCount, boolean notifyClient = true);
 
 	/**
 	 * Sends a CommandQueueRemove ObjectControllerMessage to the owner client of this object
@@ -301,6 +310,25 @@ class CreatureObject extends TangibleObject {
 	public native void sendToOwner(boolean doClose = true);
 
 	/**
+	 * Sends only the scene reset portion of sendToOwner (CmdStartScene, ParametersMessage, GuildBaselines)
+	 * Used during hyperspace to separate scene reset from object sends, giving the client
+	 * time to process the scene change before receiving SceneObjectCreate messages
+	 * @pre { this object is locked }
+	 * @post { this object is locked, owner received scene reset packets }
+	 */
+	@dirty
+	public native void sendSceneResetToOwner();
+
+	/**
+	 * Sends only the scene objects portion of sendToOwner (rootParent, close objects, group)
+	 * Used after sendSceneResetToOwner with a delay to give the client time to process CmdStartScene
+	 * @pre { this object is locked }
+	 * @post { this object is locked, owner received scene objects }
+	 */
+	@dirty
+	public native void sendObjectsToOwner(boolean doClose = true);
+
+	/**
 	 * Sends a system message to the client of this object
 	 * @pre {}
 	 * @post { this object received the message }
@@ -328,7 +356,7 @@ class CreatureObject extends TangibleObject {
 	public native void sendNewbieTutorialEnableHudElement(final string ui, boolean enable = true, float blinkCount = 0.0f);
 
 	@dirty
-	public native void sendOpenHolocronToPageMessage();
+	public native void sendOpenHolocronToPageMessage(final string page);
 
 	/**
 	 * Sends a system message to the client of this object
@@ -433,7 +461,7 @@ class CreatureObject extends TangibleObject {
 	 * @param notifyClient if set true the client will be updated with the changes
 	 */
 	@preLocked
-	public native void setAccelerationMultiplierMod(float newMultiplierMod, boolean notifyClient = true);
+	public native void setAccelerationMultiplierMod(float newMultiplierMod, boolean notifyClient = true, boolean recalculateBuffs = true);
 
 	/**
 	 * Updates the speed multiplier base
@@ -453,7 +481,7 @@ class CreatureObject extends TangibleObject {
 	 * @param notifyClient if set true the client will be updated with the changes
 	 */
 	@preLocked
-	public native abstract void setSpeedMultiplierMod(float newMultiplierMod, boolean notifyClient = true);
+	public native abstract void setSpeedMultiplierMod(float newMultiplierMod, boolean notifyClient = true, boolean recalculateBuffs = true);
 
 	/**
 	 * Updates the turn scale mod
@@ -466,6 +494,26 @@ class CreatureObject extends TangibleObject {
 	public native abstract void setTurnScale(float newMultiplierMod, boolean notifyClient = true);
 
 	/**
+	 * Updates the walk speed
+	 * @pre { this object is locked }
+	 * @post { this object is locked }
+	 * @param value new value to set
+	 * @param notifyClient if set true the client will be updated with the changes
+	 */
+	@preLocked
+	public native abstract void setWalkSpeed(float value, boolean notifyClient = true);
+
+	/**
+	 * Updates the turn scale mod
+	 * @pre { this object is locked }
+	 * @post { this object is locked }
+	 * @param value new value to be set
+	 * @param notifyClient if set true the client will be updated with the changes
+	 */
+	@preLocked
+	public native abstract void setWaterModPercent(float value, boolean notifyClient = true);
+
+	/**
 	 * Updates the run speed
 	 * @pre { this object is locked }
 	 * @post { this object is locked }
@@ -473,6 +521,8 @@ class CreatureObject extends TangibleObject {
 	 */
 	@preLocked
 	public native void setRunSpeed(float newSpeed, boolean notifyClient = true);
+
+	public native void updateRunSpeed();
 
 	public void setCurrentSpeed(float newSpeed) {
 		currentSpeed = newSpeed;
@@ -741,6 +791,21 @@ class CreatureObject extends TangibleObject {
 		return creatureBuffs.getModifierByName(skillMod);
 	}
 
+	@read
+	public boolean hasBuff(unsigned int buffcrc) {
+		return creatureBuffs.hasBuff(buffcrc);
+	}
+
+	@read
+	public boolean hasSpice() {
+		return creatureBuffs.hasSpice();
+	}
+
+	@read
+	public boolean hasTrapBuff() {
+		return creatureBuffs.hasTrapBuff();
+	}
+
 	@preLocked
 	public abstract int addDotState(CreatureObject attacker,
 				unsigned long dotType,
@@ -777,11 +842,6 @@ class CreatureObject extends TangibleObject {
 	@local
 	public DamageOverTimeList getDamageOverTimeList() {
 		return damageOverTimeList;
-	}
-
-	@read
-	public boolean hasBuff(unsigned int buffcrc) {
-		return creatureBuffs.hasBuff(buffcrc);
 	}
 
 	@preLocked
@@ -849,21 +909,22 @@ class CreatureObject extends TangibleObject {
 	}
 
 	/**
-	 * Sets the terrain negotiation variable, and updates it.
+	 * Sets the slope mod percent.
 	 * @pre { this object is locked }
-	 * @post { this object is locked, this object has the specified terrain negotiation }
-	 * @param terrain new terrain negotiation
+	 * @post { this object is locked, this object has the specified slope mod andgle & percent. }
 	 * @param notifyClient if set true the client will be updated with the changes
 	 */
 	@preLocked
-	public native void setTerrainNegotiation(float value, boolean notifyClient = true);
+	public native void updateSlopeMods(boolean notifyClient = true);
 
 	/**
-	 * Updates the client with the players current terrain negotiation.
+	 * Sets the slope mod percent.
 	 * @pre { this object is locked }
-	 * @post { this object is locked, this object has the specified terrain negotiation }
+	 * @post { this object is locked, this object has the specified slope mod andgle & percent. }
+	 * @param notifyClient if set true the client will be updated with the changes
 	 */
-	public native void updateTerrainNegotiation();
+	@preLocked
+	public native void updateWaterMod(boolean notifyClient = true);
 
 	/**
 	 * Adds the specified skillbox to this object
@@ -1026,6 +1087,11 @@ class CreatureObject extends TangibleObject {
 	@preLocked
 	public native void setAlternateAppearance(final string appearanceTeamplate, boolean notifyClient = true);
 
+	@preLocked
+	public void setSpawnerID(unsigned long spawnID) {
+		spawnerID = spawnID;
+	}
+
 	/**
 	 * Cleares a state from the state bitmask
 	 * @pre { this object is locked }
@@ -1034,6 +1100,9 @@ class CreatureObject extends TangibleObject {
 	 */
 	@preLocked
 	public native boolean clearState(unsigned long state, boolean notifyClient = true);
+
+	@preLocked
+	public native void clearSpaceStates();
 
 	@preLocked
 	public void setControlDevice(ControlDevice device) {
@@ -1076,10 +1145,13 @@ class CreatureObject extends TangibleObject {
 	public native boolean isAttackableBy(TangibleObject object, boolean bypassDeadCheck);
 
 	@dirty
-	public native boolean isHealableBy(CreatureObject object);
+	public abstract native boolean isHealableBy(CreatureObject object);
 
 	@dirty
-	public native boolean isInvulnerable();
+	public native boolean healFactionChecks(CreatureObject object, boolean isPlayer);
+
+	@dirty
+	public native abstract boolean isInvulnerable();
 
 	/**
 	 * Evaluates if the bounty hunter has a mission with the target.
@@ -1090,6 +1162,29 @@ class CreatureObject extends TangibleObject {
 	public native boolean hasBountyMissionFor(CreatureObject target);
 
 	/**
+	 * DeltaVectorMap of objects of CreO and Group for JTL Misisons.
+	 * @param object ID of the mission object to add.
+	 */
+	@preLocked
+	public native void addSpaceMissionObject(unsigned long missionOwnerID, unsigned long objectID, boolean notifyClient, boolean notifyGroup = false);
+
+	/**
+	 * DeltaVectorMap of objects of CreO and Group for JTL Misisons.
+	 * @param object ID of the mission object to remove.
+	 */
+	@preLocked
+	public native void removeSpaceMissionObject(unsigned long missionOwnerID, unsigned long objectID, boolean notifyClient, boolean notifyGroup = false);
+
+	@preLocked
+	public native void removeAllSpaceMissionObjects(boolean notifyClient = false);
+
+	@local
+	@read
+	public final DeltaSet<unsigned long, unsigned long> getSpaceMissionObjects() {
+		return spaceMissionObjects;
+	}
+
+	/**
 	 * sends the conversation list
 	 * @pre {this locked, player locked }
 	 * @post { this locked, player locked }
@@ -1097,6 +1192,17 @@ class CreatureObject extends TangibleObject {
 	 */
 	@dirty
 	public abstract boolean sendConversationStartTo(SceneObject player) {
+		return false;
+	}
+
+	/**
+	 * sends conversation end
+	 * @pre {this locked}
+	 * @post {this locked}
+	 */
+	@dirty
+	@preLocked
+	public abstract boolean stopConversation() {
 		return false;
 	}
 
@@ -1154,7 +1260,7 @@ class CreatureObject extends TangibleObject {
 	 * @return returns true if its aggressive
 	 */
 	@dirty
-	public native boolean isAggressiveTo(CreatureObject object);
+	public native boolean isAggressiveTo(TangibleObject object);
 
 	/**
 	 * Is called when this object is destroyed
@@ -1184,14 +1290,14 @@ class CreatureObject extends TangibleObject {
 	public native void notifyLoadFromDatabase();
 
 	@local
-	public native void notifyInsert(QuadTreeEntry obj);
+	public native void notifyInsert(TreeEntry obj);
 
 	@local
-	public native void notifyDissapear(QuadTreeEntry obj);
+	public abstract native void notifyDissapear(TreeEntry obj);
 
 	@dirty
 	@local
-	public native void notifyPositionUpdate(QuadTreeEntry entry);
+	public native void notifyPositionUpdate(TreeEntry entry);
 
 	/**
 	 * Destroys this object from database
@@ -1354,11 +1460,6 @@ class CreatureObject extends TangibleObject {
 		return cooldownTimerMap;
 	}
 
-	@read
-	public boolean hasSpice() {
-		return creatureBuffs.hasSpice();
-	}
-
 	public void updateLastSuccessfulCombatAction() {
 		lastSuccessfulCombatAction.updateToCurrentTime();
 	}
@@ -1401,6 +1502,16 @@ class CreatureObject extends TangibleObject {
 		return cooldownTimerMap.isPast("knockdownRecovery");
 	}
 
+	@preLocked
+	public void setNextAllowedMoveTime(unsigned long time) {
+		nextAllowedMoveTime.updateToCurrentTime();
+		nextAllowedMoveTime.addMiliTime(time);
+	}
+
+	@read
+	public boolean isMovementAllowed() {
+		return nextAllowedMoveTime.isPast();
+	}
 
 	// Updates directional arrows and planet names for group members out of range
 	@dirty
@@ -1478,14 +1589,6 @@ class CreatureObject extends TangibleObject {
 
 	@dirty
 	public native void doCombatAnimation(unsigned int animationCRC);
-
-	@preLocked
-	public native void activateQueueAction();
-
-	public native void removeQueueAction(int action);
-
-	@preLocked
-	public native void activateImmediateAction();
 
 	@read
 	public native unicode getCreatureName();
@@ -1651,24 +1754,12 @@ class CreatureObject extends TangibleObject {
 		return speedMultiplierModChanges;
 	}
 
-	@preLocked
-	@local
-	@read
-	public final CommandQueueActionVector getCommandQueue() {
-		return commandQueue;
-	}
-
-	@preLocked
-	@local
-	@read
-	public final CommandQueueActionVector getImmediateQueue() {
-		return immediateQueue;
-	}
 
 	@read
 	public int getCommandQueueSize() {
-		return commandQueue.size();
+		return commandQueue.getQueueSize();
 	}
+
 
 	@preLocked
 	public void setLastActionCounter(unsigned int ctr) {
@@ -1690,8 +1781,20 @@ class CreatureObject extends TangibleObject {
 	}
 
 	@read
-	public float getRunSpeed() {
-		return runSpeed;
+	public float getSlopeModAngle() {
+		return slopeModAngle;
+	}
+
+	@read
+	public native float getSlopeModPercent();
+
+	@local
+	@dirty
+	public native float getRunSpeed();
+
+	@read
+	public float getWaterModPercent() {
+		return waterModPercent;
 	}
 
 	@read
@@ -1703,9 +1806,6 @@ class CreatureObject extends TangibleObject {
 	public float getTurnScale() {
 		return turnScale;
 	}
-
-	@read
-	public native float getTerrainNegotiation();
 
 	@read
 	public float getRunAcceleration() {
@@ -1807,11 +1907,6 @@ class CreatureObject extends TangibleObject {
 	}
 
 	@read
-	public float getSlopeModPercent() {
-		return slopeModPercent;
-	}
-
-	@read
 	public int getPerformanceStartTime() {
 		return performanceStartTime;
 	}
@@ -1824,11 +1919,6 @@ class CreatureObject extends TangibleObject {
 	@read
 	public byte getFrozen() {
 		return frozen;
-	}
-
-	@read
-	public float getHeight() {
-		return height;
 	}
 
 	@read
@@ -1849,10 +1939,10 @@ class CreatureObject extends TangibleObject {
 	}
 
 	@read
-	public native boolean hasEffectImmunity(byte effectType);
+	public abstract native boolean hasEffectImmunity(byte effectType);
 
 	@read
-	public native boolean hasDotImmunity(unsigned int dotType);
+	public abstract native boolean hasDotImmunity(unsigned int dotType);
 
 	@read
 	public abstract native int getSpecies();
@@ -1936,6 +2026,11 @@ class CreatureObject extends TangibleObject {
 	@local
 	public native CreatureObject asCreatureObject();
 
+	@local
+	public Time getNextActionTime() {
+		return nextAction;
+	}
+
 	@read
 	public boolean isNextActionPast() {
 		return nextAction.isPast();
@@ -1959,6 +2054,11 @@ class CreatureObject extends TangibleObject {
 	@read
 	public float getSwimHeight() {
 		return swimHeight;
+	}
+
+	@read
+	public unsigned long getSpawnerID() {
+		return spawnerID;
 	}
 
 	@mock
@@ -2120,6 +2220,31 @@ class CreatureObject extends TangibleObject {
 	}
 
 	@read
+	public boolean isPilotingShip() {
+		return (stateBitmask & CreatureState.PILOTINGSHIP) || (stateBitmask & CreatureState.PILOTINGPOBSHIP);
+	}
+
+	@read
+	public boolean isOnboardPobShip() {
+		return (stateBitmask & CreatureState.SHIPINTERIOR) || (stateBitmask & CreatureState.SHIPOPERATIONS) || (stateBitmask & CreatureState.SHIPGUNNER);
+	}
+
+	@read
+	public boolean isInShipStation() {
+		return (stateBitmask & CreatureState.PILOTINGPOBSHIP) || (stateBitmask & CreatureState.SHIPOPERATIONS) || (stateBitmask & CreatureState.SHIPGUNNER);
+	}
+
+	@read
+	public boolean isPobShipOperator() {
+		return stateBitmask & CreatureState.SHIPOPERATIONS;
+	}
+
+	@read
+	public boolean isShipGunner() {
+		return stateBitmask & CreatureState.SHIPGUNNER;
+	}
+
+	@read
 	public boolean isWalking() {
 		return currentSpeed <= walkSpeed;
 	}
@@ -2136,6 +2261,11 @@ class CreatureObject extends TangibleObject {
 
 	@dirty
 	public abstract boolean isDroidObject() {
+		return false;
+	}
+
+	@dirty
+	public abstract boolean isHelperDroidObject() {
 		return false;
 	}
 
@@ -2190,6 +2320,21 @@ class CreatureObject extends TangibleObject {
 
 	@read
 	public native float calculateCostAdjustment(byte stat, float baseCost);
+
+	@read
+	public native float getSpeedModifier();
+
+	@read
+	public native float getAccelerationModifier();
+
+	@read
+	public native float getHeight(boolean postureMod = false);
+
+	@local
+	public native void sendSpeedAndAccelerationMods(SceneObject player);
+
+	@local
+	public native void broadcastSpeedAndAccelerationMods(boolean sendSelf = true);
 
 	@preLocked
 	public native void updateSpeedAndAccelerationMods();
@@ -2263,4 +2408,27 @@ class CreatureObject extends TangibleObject {
 
 	@local
 	public native Instrument getPlayableInstrument();
+
+	@preLocked
+	public void setTradeTargetID(unsigned long playerID) {
+		tradeTargetID = playerID;
+	}
+
+	public unsigned long getTradeTargetID() {
+		return tradeTargetID;
+	}
+
+	@dirty
+	@local
+	public native boolean checkInConversationRange(SceneObject object);
+
+	@preLocked
+	public native void setQueueCommandDeltaTime(@dereferenced final String commandName, @dereferenced final String commandGroup);
+
+	public native unsigned long getQueueCommandDeltaTime(@dereferenced final String commandName);
+
+	@dirty
+	public native abstract float getOutOfRangeDistance(unsigned long specialRangeObjectID = 0);
+
+	public native boolean isMissionRangeObject(@dereferenced final unsigned long objectID);
 }

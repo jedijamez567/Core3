@@ -32,14 +32,7 @@ fbase_stormtrooper_sniper_extreme = Creature:new {
 	lootGroups = {
 		{
 			groups = {
-				{group = "color_crystals", chance = 100000},
-				{group = "junk", chance = 6000000},
-				{group = "weapons_all", chance = 1200000},
-				{group = "armor_all", chance = 1200000},
-				{group = "clothing_attachments", chance = 150000},
-				{group = "armor_attachments", chance = 150000},
-				{group = "stormtrooper_common", chance = 200000},
-				{group = "wearables_all", chance = 1000000}
+				{group = "imperial_stormtrooper_tier_4", chance = 10000000}
 			}
 		}
 	},
@@ -49,9 +42,7 @@ fbase_stormtrooper_sniper_extreme = Creature:new {
 	primaryWeapon = "stormtrooper_rifle",
 	secondaryWeapon = "stormtrooper_pistol",
 	thrownWeapon = "thrown_weapons",
-
 	reactionStf = "@npc_reaction/stormtrooper",
-	thrownWeapon = "thrown_weapons",
 
 	-- primaryAttacks and secondaryAttacks should be separate skill groups specific to the weapon type listed in primaryWeapon and secondaryWeapon
 	-- Use merge() to merge groups in creatureskills.lua together. If a weapon is set to "none", set the attacks variable to empty brackets

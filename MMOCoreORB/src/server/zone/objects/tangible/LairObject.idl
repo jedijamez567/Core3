@@ -11,7 +11,7 @@ include server.zone.CloseObjectsVector;
 include system.thread.atomic.AtomicInteger;
 include engine.log.Logger;
 import server.zone.objects.scene.SceneObject;
-import server.zone.QuadTreeEntry;
+import server.zone.TreeEntry;
 
 @json
 class LairObject extends TangibleObject {
@@ -22,6 +22,8 @@ class LairObject extends TangibleObject {
 
 	protected transient DespawnLairOnPlayerDisappear despawnEvent;
 
+	protected boolean repopulated;
+
 	public LairObject() {
 		Logger.setLoggingName("LairObject");
 
@@ -29,6 +31,7 @@ class LairObject extends TangibleObject {
 		super.closeobjects.setNoDuplicateInsertPlan();
 
 		despawnOnNoPlayersInRange = false;
+		repopulated = false;
 	}
 
 	@dirty
@@ -41,12 +44,22 @@ class LairObject extends TangibleObject {
 		return despawnOnNoPlayersInRange;
 	}
 
+	@read
+	public boolean isRepopulated() {
+		return repopulated;
+	}
+
 	@preLocked
 	public void setDespawnOnNoPlayersInRange(boolean b) {
 		despawnOnNoPlayersInRange = b;
 	}
 
-	public void notifyInsert(QuadTreeEntry entry) {
+	@preLocked
+	public void setLairRepopulated(boolean repop) {
+		repopulated = repop;
+	}
+
+	public void notifyInsert(TreeEntry entry) {
 		SceneObject obj = (SceneObject) entry;
 
 		if (obj == this)
@@ -61,22 +74,8 @@ class LairObject extends TangibleObject {
 		}
 	}
 
-	public void notifyDissapear(QuadTreeEntry entry) {
-		SceneObject obj = (SceneObject) entry;
-
-		if (obj == this)
-			return;
-
-		if (obj.isPlayerCreature()) {
-			CreatureObject creo = (CreatureObject) obj;
-			if (!creo.isInvisible()) {
-				int val = numberOfPlayersInRange.decrement();
-
-				if (val <= 0 && despawnOnNoPlayersInRange)
-					activateDespawnEvent();
-			}
-		}
-	}
+	@local
+	public abstract native void notifyDissapear(TreeEntry entry);
 
 	public void activateDespawnEvent() {
 		if (despawnEvent)

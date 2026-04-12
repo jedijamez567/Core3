@@ -293,12 +293,13 @@ void BuffImplementation::applyAttributeModifiers() {
 
 		try {
 			int currentMaxHAM = creo->getMaxHAM(attribute);
-
 			int newMaxHAM = currentMaxHAM + value;
+
 			if (newMaxHAM < 1)
 					newMaxHAM = 1;
 
 			int buffAmount = newMaxHAM - currentMaxHAM;
+
 			attributeModifiers.drop(attribute);
 			attributeModifiers.put(attribute, buffAmount);
 
@@ -320,7 +321,6 @@ void BuffImplementation::applyAttributeModifiers() {
 			e.printStackTrace();
 		}
 	}
-
 }
 
 void BuffImplementation::applySkillModifiers() {
@@ -343,7 +343,6 @@ void BuffImplementation::applySkillModifiers() {
 	// if there was a speed or acceleration mod change, this will take care of immediately setting them.
 	// the checks for if they haven't changed are in these methods
 	creo->updateSpeedAndAccelerationMods();
-	creo->updateTerrainNegotiation();
 }
 
 void BuffImplementation::applyStates() {
@@ -381,18 +380,21 @@ void BuffImplementation::removeAttributeModifiers() {
 			continue;
 
 		try {
-
-			int attributemax = creo->getMaxHAM(attribute) - value;
+			int attributeMax = creo->getMaxHAM(attribute) - value;
 
 			int currentVal = creo->getHAM(attribute);
 
-			creo->setMaxHAM(attribute, attributemax);
+			// info(true) << "removeAttributeModifiers - setting max HAM for attribute " << attribute << " to a value of " << attributeMax;
 
-			if (currentVal >= attributemax) {
-				//creature.get()->inflictDamage(creature.get(), attribute, currentVal - attributemax, isSpiceBuff());
+			creo->setMaxHAM(attribute, attributeMax);
 
+			if (currentVal >= attributeMax) {
 				if (attribute % 3 == 0) {
-					creo->inflictDamage(creo, attribute, currentVal - attributemax, false);
+					int newValue = currentVal - attributeMax;
+
+					// info(true) << "removeAttributeModifiers - inflict damage: " << newValue;
+
+					creo->inflictDamage(creo, attribute, newValue, true, true);
 				} // else setMaxHam sets secondaries to max
 			}
 
@@ -430,7 +432,6 @@ void BuffImplementation::removeSkillModifiers() {
 	// if there was a speed or acceleration mod change, this will take care of immediately setting them.
 	// the checks for if they haven't changed are in these methods
 	creo->updateSpeedAndAccelerationMods();
-	creo->updateTerrainNegotiation();
 }
 
 void BuffImplementation::removeStates() {

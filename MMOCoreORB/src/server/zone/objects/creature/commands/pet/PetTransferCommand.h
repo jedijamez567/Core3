@@ -25,6 +25,7 @@ public:
 			return GENERALERROR;
 
 		ManagedReference<AiAgent*> pet = cast<AiAgent*>(creature);
+
 		if (pet == nullptr)
 			return GENERALERROR;
 
@@ -103,8 +104,8 @@ public:
 		pet->setFollowObject(targetPlayer);
 		pet->storeFollowObject();
 
-		if (targetPlayer->getPvpStatusBitmask() & CreatureFlag::PLAYER)
-			pet->setPvpStatusBitmask(targetPlayer->getPvpStatusBitmask() - CreatureFlag::PLAYER, true);
+		if (targetPlayer->getPvpStatusBitmask() & ObjectFlag::PLAYER)
+			pet->setPvpStatusBitmask(targetPlayer->getPvpStatusBitmask() - ObjectFlag::PLAYER, true);
 		else
 			pet->setPvpStatusBitmask(targetPlayer->getPvpStatusBitmask(), true);
 
@@ -116,9 +117,16 @@ public:
 
 		targetCrosslocker.release();
 
-		Locker clocker(player, pet);
-
+		Locker plocker(player, pet);
 		ghost->removeFromActivePets(pet);
+		plocker.release();
+
+		Locker deviceLocker(controlDevice);
+		Locker targetLock(targetPlayer, controlDevice);
+
+		controlDevice->setLastCommander(targetPlayer);
+		controlDevice->setLastCommandTarget(nullptr);
+		controlDevice->setLastCommand(PetManager::FOLLOW);
 
 		return SUCCESS;
 	}

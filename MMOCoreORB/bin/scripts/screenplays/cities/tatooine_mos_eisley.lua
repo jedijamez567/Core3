@@ -106,13 +106,17 @@ TatooineMosEisleyScreenPlay = CityScreenPlay:new {
 		{"ecik",60,1.1,0.639421,66.3,101.522,1106372, "neutral"},
 		{"trainer_shipwright",60,-3.2,0.6,67.6,160,1106372, "neutral"},
 
+		-- Front of Starport
+		{"vincie_kalhoon", 0, 3525.6, 5.0, -4799.7, 123, 0, ""},
+		{"mooch_davoney", 0, 3526.8, 5.0, -4799.0, 123, 0, ""},
+		{"guillo_parootchie", 0, 3528.1, 5.0, -4799.4, 172, 0, ""},
+
 		--Cantina
 		{"commoner_old",60,36,0.1,0.7,310,1082876, "npc_sitting_chair"},
 		{"commoner_tatooine",60,29.6,0.1,-7.4,71,1082876, "npc_sitting_chair"},
 		{"commoner_tatooine",60,30.9,0.1,-8.8,10,1082876, "npc_sitting_chair"},
 		{"commoner_tatooine",60,29.4,0.1,-6.1,107,1082876, "npc_sitting_chair"},
 		{"commoner_tatooine",60,35.7,0.1,3.1,180,1082876, "npc_sitting_table"},
-		{"bartender",60,-11.5,-0.9,2,230,1082877, "conversation"},
 		{"businessman",60,10.65,-0.894992,1.91,330,1082877, "npc_standing_drinking"},
 		{"businessman",60,-4.11,-0.894992,5.4,26.8951,1082877, "happy"},
 		{"chadra_fan_female",60,10.43,-0.894992,-1.47,123.102,1082877, "worried"},
@@ -150,7 +154,6 @@ TatooineMosEisleyScreenPlay = CityScreenPlay:new {
 		{"patron_quarren",60,17,-0.9,6.8,226,1082877, "npc_sitting_chair"},
 		{"stormtrooper",400,2.84,-0.894992,-6.3,16.0005,1082877, "npc_imperial"},
 		{"stormtrooper_squad_leader",400,3.62,-0.894992,-6.78,360.011,1082877, "npc_accusing"},
-		{"wuher",60,-14,-0.9,0,90,1082877, "worried"},
 		{"doikk_nats",60,2.32,-0.894992,-16.47,44.0013,1082880, "themepark_music_3"},
 		{"figrin_dan",60,3.69,-0.894992,-14.4,50.0015,1082880, "themepark_music_3"},
 		{"nalan_cheel",60,0.54,-0.894992,-17.13,38.0011,1082880, "themepark_music_1"},
@@ -159,43 +162,20 @@ TatooineMosEisleyScreenPlay = CityScreenPlay:new {
 		{"dravis",60,-21.2103,-0.894989,24.3324,164.437,1082886, "neutral"},
 		{"talon_karrde",60,-18.7,-0.9,24.9,-31.0,1082886, "npc_sitting_chair"},
 
-		--western Tavern A
-		{"protocol_droid_3po",60,5.3,1.0,4.2,0,1188033, "conversation"},
-		{"eg6_power_droid",60,-0.7,0.4,-0.8,-90,1188034, "worried"},
-		{"surgical_droid_21b",60,-2.3,0.4,-0.9,90,1188034, "angry"},
-		{"surgical_droid_21b",60,0,0.4,-2.6,0,1188034, "angry"},
-		{"surgical_droid_21b",60,1.0,0.4,-0.7,-102,1188034, "angry"},
-		{"surgical_droid_21b",60,-1.0,0.4,0.4,173,1188034, "angry"},
-		{"info_broker",60,-9.1,1.0,8.0,141,1188035, "npc_sitting_table_eating"},
-		{"contractor",60,-9.3,1.0,5.0,58,1188035, "npc_sitting_table_eating"},
-
 		--western Tavern B
-		{"sullustan_male",60,0.7,1.0,6.9,-42,1188048, "npc_sitting_chair"},
-		{"sullustan_male",60,-1.8,1.0,8.8,-130,1188048, "npc_sitting_table"},
-		{"sullustan_male",60,-5.6,1.0,8.8,136,1188048, "npc_sitting_chair"},
-		{"businessman",60,-8.1,1.0,7.0,97,1188048, "npc_sitting_table_eating"},
-		{"sullustan_male",60,-5.7,1.0,5.1,43,1188048, "npc_sitting_table"},
-		{"sullustan_male",60,-1.9,1.0,5.1,-26,1188048, "npc_sitting_chair"},
-		{"entertainer",60,-6.9,0.4,-6.3,-90,1188047, "calm"},
+		{"commoner_tatooine",60,7.6,0.4,-7.3,8,1188047, ""},
+		{"commoner_tatooine",60,7.8,0.4,-5.8,-173,1188047, ""},
+		{"bodyguard_zabrak_female",300,-4.0,0.4,-5.5,176,1188047, "calm"},
+		{"entertainer",60,-4.1,0.4,-7.5,-1,1188047, "conversation"},
+		{"commoner_tatooine",60,-0.9,0.4,1.3,-154,1188047, ""},
+		{"commoner_tatooine",60,-1.8,0.4,1.2,135,1188047, ""},
+		{"commoner_tatooine",60,-0.8,0.4,-0.1,-25,1188047, "conversation"},
+		{"noble",60,1.8,0.4,-8.1,-5,1188047, "calm"},
 
 		--western Tavern C
 		{"chiss_female",60,0.4,1.0,6.8,-42,1187987, "npc_sitting_chair"},
 		{"scientist",60,0,1.0,6.5,62,1187987, "sad"},
 		{"jawa",360,-5.4,0.4,-7.4,0,1187986, "nervous"},
-
-		--western Tavern D
-		{"r4",60,4.7,1.0,4.5,50,1187918, "happy"},
-		{"shadowy_figure",60,3.0,0.4,-0.4,175,1187919, "conversation"},
-		{"twilek_slave",60,2.9,0.4,-4.1,0,1187919, "npc_sitting_ground"},
-		{"patron_devaronian",60,1.7,0.4,-2.0,152,1187919, "npc_consoling"},
-		{"patron_devaronian",60,0.5,0.4,-3.2,100,1187919, "npc_consoling"},
-		{"patron_devaronian",60,0.4,0.4,-4.8,72,1187919, "npc_consoling"},
-		{"patron_devaronian",60,1.7,0.4,-5.9,21,1187919, "npc_consoling"},
-		{"patron_devaronian",60,4.1,0.4,-6.1,-30,1187919, "npc_consoling"},
-		{"patron_devaronian",60,5.4,0.4,-4.9,-83,1187919, "npc_consoling"},
-		{"patron_devaronian",60,5.5,0.4,-3.2,-107,1187919, "npc_consoling"},
-		{"patron_devaronian",60,4.2,0.4,-2.2,-158,1187919, "bored"},
-		{"noble",60,-7.4,0.4,-7.4,33,1187919, "npc_standing_drinking"},
 
 		--western Tavern E
 		{"businessman",60,5.2,1.0,4.2,7,1187892, "happy"},
@@ -210,18 +190,13 @@ TatooineMosEisleyScreenPlay = CityScreenPlay:new {
 		{"rancher",60,-2.46731,0.408271,-1.67245,0,1187893, "worried"},
 
 		--large house west A
-		{"commoner_fat",60,-5.1,0.5,-5.0,89,1187999, "npc_sitting_chair"},
-		{"commoner_fat",60,-5.1,0.5,-8.0,89,1187999, "npc_sitting_chair"},
-		{"commoner_fat",60,-3.0,0.5,-9.5,0,1187999, "npc_sitting_chair"},
-		{"judge",60,0,0.5,-9.5,0,1187999, "npc_sitting_table_eating"},
-		{"commoner_fat",60,3.0,0.5,-9.5,0,1187999, "npc_sitting_chair"},
-		{"commoner_fat",60,5.1,0.5,-8.0,-89,1187999, "npc_sitting_chair"},
-		{"commoner_fat",60,5.1,0.5,-5.0,-89,1187999, "npc_sitting_chair"},
-		{"entertainer",60,2.3,0.5,-6.0,107,1187999, "entertained"},
-		{"entertainer",60,0,0.5,-5.8,175,1187999, "entertained"},
-		{"entertainer",60,-2.3,0.5,-6.4,-133,1187999, "entertained"},
-		{"entertainer",60,0,0.5,-2.5,160,1187999, "npc_sitting_ground"},
-		{"commoner_technician",60,-22.4,1.0,-9.0,-106,1188001, "sad"},
+		{"sullustan_male",60,-8.8,1.0,2.5,-18,1187999, "worried"},
+		{"imperial_private",300,-8.3,1.0,4.1,-165,1187999, "npc_imperial"},
+		{"commoner",60,-9.5,1.0,4.1,155,1187999, ""},
+		{"commoner",60,11.3,1.0,6.4,10,1187999, ""},
+		{"commoner",60,11.3,1.0,7.7,-177,1187999, ""},
+		{"commoner",60,1.0,-4.0,-7.1,178,1718396, ""},
+		{"mos_eisley_police_officer",60,1.0,-4.0,-8.3,-1,1718396, ""},
 
 		--large house west B
 		{"chiss_male",60,-2.3,1.0,6.7,90,1187871, "npc_sitting_chair"},
@@ -291,7 +266,7 @@ TatooineMosEisleyScreenPlay = CityScreenPlay:new {
 		{"rodian_clan_captain", 300, 5.07127, 2.6, 6.65958, 0, 1105851, "conversation"},
 		{"noble",60,26.93,2.12878,58.19,222.007,1105852, ""},
 		{"noble",60,19.26,2.12847,56.13,266.008,1105853, ""},
-		{"brawler",60,17.0318,2.12878,75.3601,0,1105853, "conversation"},
+		{"brawler",300,17.0318,2.12878,75.3601,0,1105853, "conversation"},
 		{"dede_chesmi",60,26.7839,2.12847,70.8524,180.013,1105853, "conversation"},
 		{"mebi_axane",60,26.7839,2.12876,69.7524,360.011,1105853, "conversation"},
 		{"medic",300,17.0318,2.12878,76.3601,179.996,1105853, "conversation"},
@@ -415,7 +390,7 @@ function TatooineMosEisleyScreenPlay:spawnMobiles()
 				CreatureObject(pMobile):setMoodString(mob[8])
 			end
 
-			AiAgent(pMobile):addCreatureFlag(AI_STATIC)
+			AiAgent(pMobile):addObjectFlag(AI_STATIC)
 
 			if CreatureObject(pMobile):getPvpStatusBitmask() == 0 then
 				CreatureObject(pMobile):clearOptionBit(AIENABLED)
@@ -433,6 +408,7 @@ function TatooineMosEisleyScreenPlay:spawnMobiles()
 	end
 
 	--Creatures
+	--[[
 	spawnMobile(self.planet, "minor_worrt",300,3863.8,5,-4809.5,170,0)
 	spawnMobile(self.planet, "minor_worrt",300,3857.8,5,-4814.4,127,0)
 	spawnMobile(self.planet, "minor_worrt",300,3856.5,5,-4826.1,45,0)
@@ -483,4 +459,5 @@ function TatooineMosEisleyScreenPlay:spawnMobiles()
 	spawnMobile(self.planet, "worrt",300,3585.7,5,-4530.5,-81,0)
 	spawnMobile(self.planet, "worrt",300,3573.9,5,-4529.6,108,0)
 	spawnMobile(self.planet, "worrt",300,3580.5,5,-4544.8,34,0)
+	]]
 end
