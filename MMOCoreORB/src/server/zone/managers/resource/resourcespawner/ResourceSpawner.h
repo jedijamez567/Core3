@@ -71,7 +71,10 @@ private:
 
 	int shiftDuration, lowerGateOverride, maxSpawnAmount, spawnThrottling;
 
-	int samplingMultiplier;
+	float samplingMultiplier;
+	float gambleMultiplier;
+	float concentrationMultiplier;
+	int sampleIntervalMs;
 
 public:
 	ResourceSpawner(ManagedReference<ZoneServer* > serv,
@@ -90,6 +93,12 @@ public:
 	void addJtlResource(const String& resourceName);
 	void setSpawningParameters(bool loadFromScript, const int dur, const int throt,
 			const int override, const int spawnquantity);
+
+	void setSampleTuning(float yieldMult, float gambleMult, float concMult, int intervalMs);
+
+	inline int getSampleIntervalMs() const {
+		return sampleIntervalMs;
+	}
 
 	void spawnScriptResources();
 	bool writeAllSpawnsToScript();

@@ -90,6 +90,8 @@ class FrsManager extends ManagedService implements Logger {
 	protected transient boolean autoPromotionEnabled;
 	protected transient boolean sameAccountEnclaveRestrictions;
 
+	protected transient float pveForceRankXpRatio;
+
 	protected transient unsigned long petitionInterval;
 	protected transient unsigned long votingInterval;
 	protected transient unsigned long acceptanceInterval;
@@ -120,6 +122,7 @@ class FrsManager extends ManagedService implements Logger {
 
 		frsEnabled = false;
 		autoPromotionEnabled = false;
+		pveForceRankXpRatio = 0.0f;
 
 		lightEnclave = null;
 		darkEnclave = null;
@@ -307,6 +310,11 @@ class FrsManager extends ManagedService implements Logger {
 	@read
 	public boolean isFrsEnabled() {
 		return frsEnabled;
+	}
+
+	@read
+	public float getPveForceRankXpRatio() {
+		return pveForceRankXpRatio;
 	}
 
 	public unsigned long getVotingInterval(short status) {

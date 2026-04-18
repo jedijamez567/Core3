@@ -22,6 +22,7 @@
 #include "server/zone/managers/object/ObjectManager.h"
 #include "server/zone/managers/faction/FactionManager.h"
 #include "server/zone/managers/frs/FrsManager.h"
+#include "server/zone/managers/jedi/JediManager.h"
 #include "server/db/ServerDatabase.h"
 #include "server/chat/ChatManager.h"
 #include "server/zone/packets/chat/ChatRoomMessage.h"
@@ -2154,6 +2155,10 @@ void PlayerManagerImplementation::disseminateExperience(TangibleObject* destruct
 				trx.addState("combatGroupFactionPetLevel", group->getFactionPetLevel());
 			}
 
+			auto jediManager = JediManager::instance();
+			const float jediExperienceRatio = jediManager->getJediExperienceRatio();
+			const bool jediCountsTowardCombatGeneral = jediManager->getJediCountsTowardCombatGeneral();
+
 			for (int j = 0; j < entry->size(); ++j) {
 				uint32 damage = entry->elementAt(j).getValue();
 				String xpType = entry->elementAt(j).getKey();
@@ -2173,11 +2178,13 @@ void PlayerManagerImplementation::disseminateExperience(TangibleObject* destruct
 				if (winningFaction != Factions::FACTIONNEUTRAL && winningFaction == attackerCreo->getFaction())
 					xpAmount *= gcwBonus;
 
-				// Jedi experience doesn't count towards combat experience, and is earned at 20% the rate of normal experience
-				if (xpType != "jedi_general")
+				// Jedi experience is earned at jediExperienceRatio of normal combat damage (stock 20%)
+				// and by default does not contribute to combat_general (configurable via jediCountsTowardCombatGeneral).
+				if (xpType == "jedi_general")
+					xpAmount *= jediExperienceRatio;
+
+				if (xpType != "jedi_general" || jediCountsTowardCombatGeneral)
 					combatXp += xpAmount;
-				else
-					xpAmount *= 0.2f;
 
 				if (xpType == "dotDMG") { // Prevents XP generated from DoTs from applying to the equiped weapon, but still counts towards combat XP
 					continue;
@@ -2660,6 +2667,27 @@ int PlayerManagerImplementation::awardExperience(CreatureObject* player, const S
 			StringIdChatParameter message("base_player", "prose_hit_xp_cap"); //You have achieved your current limit for %TO experience.
 			message.setTO("exp_n", xpType);
 			player->sendSystemMessage(message);
+		}
+	}
+
+	if (xp > 0 && xpType == "jedi_general") {
+		FrsManager* frsManager = server->getFrsManager();
+
+		if (frsManager != nullptr && frsManager->isFrsEnabled()) {
+			float ratio = frsManager->getPveForceRankXpRatio();
+
+			if (ratio > 0.0f) {
+				FrsData* frsData = playerObject->getFrsData();
+				int councilType = frsData->getCouncilType();
+				int rank = frsData->getRank();
+
+				if (rank >= 0 && (councilType == FrsManager::COUNCIL_LIGHT || councilType == FrsManager::COUNCIL_DARK)) {
+					int frsXp = (int)(xp * ratio);
+
+					if (frsXp > 0)
+						frsManager->adjustFrsExperience(player, frsXp, false);
+				}
+			}
 		}
 	}
 

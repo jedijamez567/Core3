@@ -140,6 +140,18 @@ bool ResourceManagerImplementation::loadConfigData() {
 	String natpoolexc = lua->getGlobalString("nativepoolexcludes");
 	resourceSpawner->initializeNativePool(natpoolinc, natpoolexc);
 
+	float sampleYield = lua->getGlobalFloat("sampleYieldMultiplier");
+	float gambleMult = lua->getGlobalFloat("sampleGambleMultiplier");
+	float concMult = lua->getGlobalFloat("sampleConcentrationMultiplier");
+	int sampleInterval = lua->getGlobalInt("sampleIntervalMs");
+
+	if (sampleYield <= 0.0f) sampleYield = 1.0f;
+	if (gambleMult <= 0.0f) gambleMult = 5.0f;
+	if (concMult <= 0.0f) concMult = 5.0f;
+	if (sampleInterval < 1000) sampleInterval = 25000;
+
+	resourceSpawner->setSampleTuning(sampleYield, gambleMult, concMult, sampleInterval);
+
 	delete lua;
 
 	return true;

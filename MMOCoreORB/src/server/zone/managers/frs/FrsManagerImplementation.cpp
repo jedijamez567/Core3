@@ -167,6 +167,7 @@ void FrsManagerImplementation::loadLuaConfig() {
 
 	frsEnabled = lua->getGlobalInt("frsEnabled");
 	autoPromotionEnabled = lua->getGlobalInt("autoPromotionEnabled");
+	pveForceRankXpRatio = lua->getGlobalFloat("pveForceRankXpRatio");
 	petitionInterval = lua->getGlobalLong("petitionInterval");
 	votingInterval = lua->getGlobalLong("votingInterval");
 	acceptanceInterval = lua->getGlobalLong("acceptanceInterval");
@@ -904,25 +905,26 @@ void FrsManagerImplementation::adjustFrsExperience(CreatureObject* player, int a
 		sendSystemMessage = false;
 
 	if (amount > 0) {
-		if (ghost->hasCappedExperience("force_rank_xp")) {
+		bool capped = ghost->hasCappedExperience("force_rank_xp");
+
+		if (!capped) {
+			TransactionLog trx(TrxCode::EXPERIENCE, player);
+			ghost->addExperience(trx, "force_rank_xp", amount, true);
+
 			if (sendSystemMessage) {
-				StringIdChatParameter message("base_player", "prose_hit_xp_cap"); //You have achieved your current limit for %TO experience.
-				message.setTO("exp_n", "force_rank_xp");
-				player->sendSystemMessage(message);
+				StringIdChatParameter param("@force_rank:experience_granted"); // You have gained %DI Force Rank experience.
+				param.setDI(amount);
+				player->sendSystemMessage(param);
 			}
-			return;
+		} else if (sendSystemMessage) {
+			StringIdChatParameter message("base_player", "prose_hit_xp_cap"); //You have achieved your current limit for %TO experience.
+			message.setTO("exp_n", "force_rank_xp");
+			player->sendSystemMessage(message);
 		}
 
-		TransactionLog trx(TrxCode::EXPERIENCE, player);
-		ghost->addExperience(trx, "force_rank_xp", amount, true);
-
-		if (sendSystemMessage) {
-			StringIdChatParameter param("@force_rank:experience_granted"); // You have gained %DI Force Rank experience.
-			param.setDI(amount);
-			player->sendSystemMessage(param);
-		}
-
-		// Check for auto-promotion if enabled
+		// Auto-promotion check runs regardless of cap state so a capped player
+		// still advances when their XP crosses the next rank threshold. The new
+		// rank skill raises the cap, letting the next call resume adding XP.
 		if (autoPromotionEnabled) {
 			FrsData* playerData = ghost->getFrsData();
 			int rank = playerData->getRank();

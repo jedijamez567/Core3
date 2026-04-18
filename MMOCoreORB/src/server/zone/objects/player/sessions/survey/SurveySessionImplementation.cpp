@@ -18,6 +18,7 @@
 #include "server/zone/managers/resource/resourcespawner/SampleTask.h"
 #include "server/zone/managers/resource/resourcespawner/SurveyTask.h"
 #include "server/zone/managers/resource/resourcespawner/SampleResultsTask.h"
+#include "server/zone/managers/resource/resourcespawner/ResourceSpawner.h"
 
 int SurveySessionImplementation::initializeSession(SurveyTool* tool) {
 	activeSurveyTool = tool;
@@ -378,8 +379,16 @@ void SurveySessionImplementation::rescheduleSample() {
 	if (sampleTask == nullptr)
 		sampleTask = new SampleTask(surveyer, activeSurveyTool.get());
 
+	int intervalMs = 25000;
+	ManagedReference<ResourceManager*> rm = resourceManager.get();
+	if (rm != nullptr) {
+		ResourceSpawner* spawner = rm->getResourceSpawner();
+		if (spawner != nullptr)
+			intervalMs = spawner->getSampleIntervalMs();
+	}
+
 	if (surveyer->getPendingTask("sample") == nullptr)
-		surveyer->addPendingTask("sample", sampleTask, 25000);
+		surveyer->addPendingTask("sample", sampleTask, intervalMs);
 }
 
 void SurveySessionImplementation::rescheduleSampleResults(const ResourceSpawner* resourceSpawner, float density, const String& resname) {

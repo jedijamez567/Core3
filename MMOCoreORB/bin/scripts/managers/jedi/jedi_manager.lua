@@ -17,6 +17,13 @@ jediManagerName = "JediManager"
 
 customJediProgressionFile = "scripts/managers/jedi/custom_jedi_manager.lua"
 
+-- Rate at which Jedi earn jedi_general XP from combat damage (0.2 = stock 20% of non-Jedi rate)
+jediExperienceRatio = 0.2
+
+-- Whether jedi_general damage also contributes to combat_general XP accumulation
+-- (stock = false: force attacks give Jedi XP only, never combat_general)
+jediCountsTowardCombatGeneral = false
+
 function printf(...) io.write(string.format(table.unpack({...}))) end
 
 JediManager = ScreenPlay:new {

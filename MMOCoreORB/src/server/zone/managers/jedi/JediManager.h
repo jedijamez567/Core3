@@ -27,6 +27,18 @@ private:
 	 */
 	String jediManagerName;
 
+	/**
+	 * Rate at which Jedi earn jedi_general XP from combat damage (0.2 = stock 20%).
+	 * Loaded from scripts/managers/jedi/jedi_manager.lua.
+	 */
+	float jediExperienceRatio;
+
+	/**
+	 * Whether jedi_general damage also contributes to combat_general XP accumulation.
+	 * Loaded from scripts/managers/jedi/jedi_manager.lua.
+	 */
+	bool jediCountsTowardCombatGeneral;
+
 	AtomicBoolean loaded{false};
 
 	/**
@@ -109,6 +121,16 @@ public:
 	 * @return the value of the currently active jedi progression type.
 	 */
 	int getJediProgressionType();
+
+	/**
+	 * Get the configured Jedi combat XP rate (applied to jedi_general XP from damage).
+	 */
+	float getJediExperienceRatio();
+
+	/**
+	 * Whether jedi_general damage should also add to combat_general XP accumulation.
+	 */
+	bool getJediCountsTowardCombatGeneral();
 
 	/**
 	 * Set the name of the currently active lua jedi manager.

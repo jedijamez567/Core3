@@ -38,7 +38,10 @@ ResourceSpawner::ResourceSpawner(ManagedReference<ZoneServer*> serv,
 
 	nameManager = processor->getNameManager();
 	objectManager = server->getObjectManager();
-	samplingMultiplier = 1; //should be 1 for normal use
+	samplingMultiplier = 1.0f; //should be 1 for normal use; tunable via resource_manager.lua
+	gambleMultiplier = 5.0f;
+	concentrationMultiplier = 5.0f;
+	sampleIntervalMs = 25000;
 
 	minimumPool = new MinimumPool(this);
 	fixedPool = new FixedPool(this);
@@ -119,6 +122,13 @@ void ResourceSpawner::setSpawningParameters(bool loadFromScript, const int dur, 
 		lowerGateOverride = 1;
 	if (lowerGateOverride > 1000)
 		lowerGateOverride = 1000;
+}
+
+void ResourceSpawner::setSampleTuning(float yieldMult, float gambleMult, float concMult, int intervalMs) {
+	samplingMultiplier = (yieldMult > 0.0f) ? yieldMult : 1.0f;
+	gambleMultiplier = (gambleMult > 0.0f) ? gambleMult : 5.0f;
+	concentrationMultiplier = (concMult > 0.0f) ? concMult : 5.0f;
+	sampleIntervalMs = (intervalMs >= 1000) ? intervalMs : 25000;
 }
 
 void ResourceSpawner::start() {
@@ -1002,7 +1012,7 @@ void ResourceSpawner::sendSampleResults(TransactionLog& trx, CreatureObject* pla
 	if (session->tryGamble()) {
 		if (System::random(2) == 1) {
 			player->sendSystemMessage("@survey:gamble_success");
-			unitsExtracted *= 5;
+			unitsExtracted = (int) (unitsExtracted * gambleMultiplier);
 		} else {
 			player->sendSystemMessage("@survey:gamble_fail");
 		}
@@ -1013,7 +1023,7 @@ void ResourceSpawner::sendSampleResults(TransactionLog& trx, CreatureObject* pla
 	if (richSampleLocation != nullptr && richSampleLocation->getPosition() != Vector3(0, 0, 0)) {
 		if (player->getDistanceTo(richSampleLocation) < 10) {
 			player->sendSystemMessage("@survey:node_recovery");
-			unitsExtracted *= 5;
+			unitsExtracted = (int) (unitsExtracted * concentrationMultiplier);
 
 		} else {
 			player->sendSystemMessage("@survey:node_not_close");

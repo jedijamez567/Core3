@@ -7,6 +7,8 @@
 
 JediManager::JediManager() : Logger("JediManager") {
 	jediProgressionType = NOJEDIPROGRESSION;
+	jediExperienceRatio = 0.2f;
+	jediCountsTowardCombatGeneral = false;
 	setJediManagerName("JediManager");
 }
 
@@ -24,6 +26,18 @@ int JediManager::getJediProgressionType() {
 	ReadLocker locker(this);
 
 	return jediProgressionType;
+}
+
+float JediManager::getJediExperienceRatio() {
+	ReadLocker locker(this);
+
+	return jediExperienceRatio;
+}
+
+bool JediManager::getJediCountsTowardCombatGeneral() {
+	ReadLocker locker(this);
+
+	return jediCountsTowardCombatGeneral;
 }
 
 void JediManager::setJediManagerName(const String& name) {
@@ -48,6 +62,12 @@ void JediManager::loadConfiguration(Lua* luaEngine) {
 	luaEngine->runFile("scripts/managers/jedi/jedi_manager.lua");
 
 	jediProgressionType = luaEngine->getGlobalInt(String("jediProgressionType"));
+
+	{
+		Locker writeLock(this);
+		jediExperienceRatio = luaEngine->getGlobalFloat(String("jediExperienceRatio"));
+		jediCountsTowardCombatGeneral = luaEngine->getGlobalBoolean(String("jediCountsTowardCombatGeneral"));
+	}
 
 	switch (jediProgressionType) {
 	case HOLOGRINDJEDIPROGRESSION:
