@@ -465,29 +465,33 @@ bool PlayerCreationManager::createCharacter(ClientCreateCharacterCallback* callb
 
 				if (accountPermissionLevel < 9) {
 #ifndef WITH_SWGREALMS_API
-					try {
-						StringBuffer query;
-						uint32 galaxyId = zoneServer.get()->getGalaxyID();
-						uint32 accountId = client->getAccountID();
-						query << "(SELECT UNIX_TIMESTAMP(c.creation_date) as t FROM characters as c WHERE c.account_id = " << accountId << " AND c.galaxy_id = " << galaxyId << " ORDER BY c.creation_date DESC) UNION (SELECT UNIX_TIMESTAMP(d.creation_date) FROM deleted_characters as d WHERE d.account_id = " << accountId << " AND d.galaxy_id = " << galaxyId << " ORDER BY d.creation_date DESC) ORDER BY t DESC LIMIT 1";
+					if (characterCreationCooldown > 0) {
+						try {
+							StringBuffer query;
+							uint32 galaxyId = zoneServer.get()->getGalaxyID();
+							uint32 accountId = client->getAccountID();
+							query << "(SELECT UNIX_TIMESTAMP(c.creation_date) as t FROM characters as c WHERE c.account_id = " << accountId << " AND c.galaxy_id = " << galaxyId << " ORDER BY c.creation_date DESC) UNION (SELECT UNIX_TIMESTAMP(d.creation_date) FROM deleted_characters as d WHERE d.account_id = " << accountId << " AND d.galaxy_id = " << galaxyId << " ORDER BY d.creation_date DESC) ORDER BY t DESC LIMIT 1";
 
-						UniqueReference<ResultSet*> res(ServerDatabase::instance()->executeQuery(query));
+							UniqueReference<ResultSet*> res(ServerDatabase::instance()->executeQuery(query));
 
-						if (res != nullptr && res->next()) {
-							uint32 sec = res->getUnsignedInt(0);
+							if (res != nullptr && res->next()) {
+								uint32 sec = res->getUnsignedInt(0);
 
-							Time timeVal(sec);
+								Time timeVal(sec);
 
-							if (timeVal.miliDifference() < 3600000) {
-								ErrorMessage* errMsg = new ErrorMessage("Create Error", "You are only permitted to create one character per hour. Repeat attempts prior to 1 hour elapsing will reset the timer.", 0x0);
-								client->sendMessage(errMsg);
+								if (timeVal.miliDifference() < (int64)characterCreationCooldown * 1000) {
+									StringBuffer cooldownMsg;
+									cooldownMsg << "You are only permitted to create one character every " << characterCreationCooldown << " seconds. Repeat attempts prior to the cooldown elapsing will reset the timer.";
+									ErrorMessage* errMsg = new ErrorMessage("Create Error", cooldownMsg.toString(), 0x0);
+									client->sendMessage(errMsg);
 
-								playerCreature->destroyPlayerCreatureFromDatabase(true);
-								return false;
+									playerCreature->destroyPlayerCreatureFromDatabase(true);
+									return false;
+								}
 							}
+						} catch (const DatabaseException& e) {
+							error(e.getMessage());
 						}
-					} catch (const DatabaseException& e) {
-						error(e.getMessage());
 					}
 #else // WITH_SWGREALMS_API
 				// Rate limiting is enforced by API during POST /characters
