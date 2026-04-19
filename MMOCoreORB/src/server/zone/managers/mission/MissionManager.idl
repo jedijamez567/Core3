@@ -20,6 +20,7 @@ import server.zone.managers.creature.LairSpawn;
 import system.thread.Mutex;
 include system.util.Vector;
 include system.util.VectorMap;
+include system.util.HashTable;
 include engine.log.Logger;
 include engine.util.u3d.Vector3;
 import server.zone.Zone;
@@ -56,6 +57,14 @@ class MissionManager extends Observer implements Logger {
 
 	protected boolean enableSameAccountBountyMissions;
 
+	protected boolean enableMissionDirectionFilter;
+
+	@dereferenced
+	protected transient HashTable<unsigned long, int> playerDirectionFilters;
+
+	@dereferenced
+	protected transient Mutex playerDirectionFiltersMutex;
+
 	public static final unsigned int UNKNOWN_TARGET = 0xB911DA26;
 
 	unsigned long playerBountyKillBuffer;
@@ -82,6 +91,7 @@ class MissionManager extends Observer implements Logger {
 		enableFactionalReconMissions = false;
 		enableFactionalEntertainerMissions = false;
 		enableSameAccountBountyMissions = false;
+		enableMissionDirectionFilter = false;
 		playerBountyKillBuffer = 0;
 		maximumMissions = 2;
 
@@ -210,4 +220,37 @@ class MissionManager extends Observer implements Logger {
 
 	@arg1preLocked
 	public native boolean sendPlayerBountyDebug(CreatureObject player, CreatureObject target);
+
+	@dirty
+	public boolean isMissionDirectionFilterEnabled() {
+		return enableMissionDirectionFilter;
+	}
+
+	@dirty
+	public void setPlayerDirectionFilter(unsigned long playerOid, int direction) {
+		synchronized (playerDirectionFiltersMutex) {
+			if (direction < 0 || direction > 7) {
+				playerDirectionFilters.remove(playerOid);
+			} else {
+				playerDirectionFilters.put(playerOid, direction);
+			}
+		}
+	}
+
+	@dirty
+	public int getPlayerDirectionFilter(unsigned long playerOid) {
+		synchronized (playerDirectionFiltersMutex) {
+			if (!playerDirectionFilters.containsKey(playerOid)) {
+				return -1;
+			}
+			return playerDirectionFilters.get(playerOid);
+		}
+	}
+
+	@dirty
+	public void clearPlayerDirectionFilter(unsigned long playerOid) {
+		synchronized (playerDirectionFiltersMutex) {
+			playerDirectionFilters.remove(playerOid);
+		}
+	}
 }

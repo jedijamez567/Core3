@@ -1886,8 +1886,12 @@ void PlayerObjectImplementation::notifyOffline() {
 
 	MissionManager* missionManager = getZoneServer()->getMissionManager();
 
-	if (missionManager != nullptr && playerCreature->hasSkill("force_title_jedi_rank_02")) {
-		missionManager->updatePlayerBountyOnlineStatus(playerCreature->getObjectID(), false);
+	if (missionManager != nullptr) {
+		if (playerCreature->hasSkill("force_title_jedi_rank_02")) {
+			missionManager->updatePlayerBountyOnlineStatus(playerCreature->getObjectID(), false);
+		}
+
+		missionManager->clearPlayerDirectionFilter(playerCreature->getObjectID());
 	}
 
 	ManagedReference<SurveySession*> session = playerCreature->getActiveSession(SessionFacadeType::SURVEY).castTo<SurveySession*>();

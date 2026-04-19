@@ -11,7 +11,9 @@
 #include "server/zone/objects/region/CityRegion.h"
 #include "server/zone/managers/city/CityManager.h"
 #include "server/zone/managers/city/CityRemoveAmenityTask.h"
+#include "server/zone/managers/mission/MissionManager.h"
 #include "server/zone/objects/player/sessions/SlicingSession.h"
+#include "server/zone/ZoneServer.h"
 
 void MissionTerminalImplementation::fillObjectMenuResponse(ObjectMenuResponse* menuResponse, CreatureObject* player) {
 	TerminalImplementation::fillObjectMenuResponse(menuResponse, player);
@@ -27,6 +29,27 @@ void MissionTerminalImplementation::fillObjectMenuResponse(ObjectMenuResponse* m
 		menuResponse->addRadialMenuItemToRadialID(73, 75, 3, "@city/city:east"); // East
 		menuResponse->addRadialMenuItemToRadialID(73, 76, 3, "@city/city:south"); // South
 		menuResponse->addRadialMenuItemToRadialID(73, 77, 3, "@city/city:west"); // West
+	}
+
+	MissionManager* missionManager = getZoneServer()->getMissionManager();
+	if (missionManager != nullptr && missionManager->isMissionDirectionFilterEnabled()) {
+		int currentDir = missionManager->getPlayerDirectionFilter(player->getObjectID());
+		String label = "Direction Filter";
+		if (currentDir >= 0 && currentDir <= 7) {
+			static const char* shortNames[] = {"N", "NE", "E", "SE", "S", "SW", "W", "NW"};
+			label = label + " [" + shortNames[currentDir] + "]";
+		}
+
+		menuResponse->addRadialMenuItem(80, 3, label);
+		menuResponse->addRadialMenuItemToRadialID(80, 81, 3, "Clear filter");
+		menuResponse->addRadialMenuItemToRadialID(80, 82, 3, "North");
+		menuResponse->addRadialMenuItemToRadialID(80, 83, 3, "Northeast");
+		menuResponse->addRadialMenuItemToRadialID(80, 84, 3, "East");
+		menuResponse->addRadialMenuItemToRadialID(80, 85, 3, "Southeast");
+		menuResponse->addRadialMenuItemToRadialID(80, 86, 3, "South");
+		menuResponse->addRadialMenuItemToRadialID(80, 87, 3, "Southwest");
+		menuResponse->addRadialMenuItemToRadialID(80, 88, 3, "West");
+		menuResponse->addRadialMenuItemToRadialID(80, 89, 3, "Northwest");
 	}
 }
 
@@ -77,6 +100,22 @@ int MissionTerminalImplementation::handleObjectMenuSelect(CreatureObject* player
 		CityManager* cityManager = getZoneServer()->getCityManager();
 		cityManager->alignAmenity(city, player, _this.getReferenceUnsafeStaticCast(), selectedID - 74);
 
+		return 0;
+	} else if (selectedID == 81) {
+		MissionManager* missionManager = getZoneServer()->getMissionManager();
+		if (missionManager != nullptr && missionManager->isMissionDirectionFilterEnabled()) {
+			missionManager->clearPlayerDirectionFilter(player->getObjectID());
+			player->sendSystemMessage("Mission direction filter cleared.");
+		}
+		return 0;
+	} else if (selectedID >= 82 && selectedID <= 89) {
+		MissionManager* missionManager = getZoneServer()->getMissionManager();
+		if (missionManager != nullptr && missionManager->isMissionDirectionFilterEnabled()) {
+			int dir = selectedID - 82;
+			static const char* names[] = {"north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest"};
+			missionManager->setPlayerDirectionFilter(player->getObjectID(), dir);
+			player->sendSystemMessage(String("Mission direction filter set to ") + names[dir] + ".");
+		}
 		return 0;
 	}
 

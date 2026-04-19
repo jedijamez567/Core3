@@ -37,6 +37,37 @@
 #include "server/zone/objects/building/BuildingObject.h"
 #include "server/zone/managers/director/DirectorManager.h"
 
+// Returns true if the bearing from (originX, originY) to (targetX, targetY)
+// falls in the 45-degree compass wedge for `direction` (0 = N, 1 = NE, ... 7 = NW).
+// SWG world coordinate convention: +Y is north, +X is east. The north wedge wraps
+// across 0/360. Returns true unconditionally if direction is out of range, so
+// generators don't accidentally reject everything when no filter is set.
+static bool positionMatchesDirection(float originX, float originY, float targetX, float targetY, int direction) {
+	if (direction < 0 || direction > 7) {
+		return true;
+	}
+
+	float dx = targetX - originX;
+	float dy = targetY - originY;
+
+	if (dx == 0.0f && dy == 0.0f) {
+		return false;
+	}
+
+	float bearing = atan2(dx, dy) * 180.0f / static_cast<float>(M_PI);
+	if (bearing < 0.0f) {
+		bearing += 360.0f;
+	}
+
+	float wedgeCenter = direction * 45.0f;
+	float diff = fabs(bearing - wedgeCenter);
+	if (diff > 180.0f) {
+		diff = 360.0f - diff;
+	}
+
+	return diff <= 22.5f;
+}
+
 void MissionManagerImplementation::loadLuaSettings() {
 	try {
 		Lua* lua = new Lua();
@@ -99,6 +130,8 @@ void MissionManagerImplementation::loadLuaSettings() {
 		if (value.toLowerCase() == "true") {
 			enableSameAccountBountyMissions = true;
 		}
+
+		enableMissionDirectionFilter = lua->getGlobalByte("enableMissionDirectionFilter") != 0;
 
 		playerBountyKillBuffer = lua->getGlobalLong("playerBountyKillBuffer");
 		playerBountyDebuffLength = lua->getGlobalLong("playerBountyDebuffLength");
@@ -866,8 +899,12 @@ void MissionManagerImplementation::randomizeGenericDestroyMission(CreatureObject
 
 	Vector3 startPos;
 
+	int filterDir = enableMissionDirectionFilter ? getPlayerDirectionFilter(player->getObjectID()) : -1;
+	float playerX = player->getWorldPositionX();
+	float playerY = player->getWorldPositionY();
+
 	bool foundPosition = false;
-	int maximumNumberOfTries = 20;
+	int maximumNumberOfTries = (filterDir >= 0) ? 40 : 20;
 	while (!foundPosition && maximumNumberOfTries-- > 0) {
 		foundPosition = true;
 
@@ -900,6 +937,10 @@ void MissionManagerImplementation::randomizeGenericDestroyMission(CreatureObject
 				foundPosition = false;
 			}
 		} else {
+			foundPosition = false;
+		}
+
+		if (foundPosition && filterDir >= 0 && !positionMatchesDirection(playerX, playerY, startPos.getX(), startPos.getY(), filterDir)) {
 			foundPosition = false;
 		}
 	}
@@ -1329,10 +1370,19 @@ bool MissionManagerImplementation::randomGenericDeliverMission(CreatureObject* p
 	minDistance = 15.0f;
 	maxDistance = 1500.0f;
 
+	int filterDir = enableMissionDirectionFilter ? getPlayerDirectionFilter(player->getObjectID()) : -1;
+
 	const NpcSpawnPoint* endNpc = nullptr;
-	int retries = 10;
+	int retries = (filterDir >= 0) ? 20 : 10;
 	while ((endNpc == nullptr || endNpc == startNpc) && (retries > 0)) {
 		endNpc = missionNpcSpawnMap.getRandomNpcSpawnPoint(planetName.hashCode(), endPosition, getDeliverMissionSpawnType(faction), minDistance, maxDistance);
+
+		if (endNpc != nullptr && endNpc != startNpc && filterDir >= 0) {
+			if (!positionMatchesDirection(playerPosition.getX(), playerPosition.getY(), endNpc->getPosition()->getX(), endNpc->getPosition()->getY(), filterDir)) {
+				endNpc = nullptr;
+			}
+		}
+
 		retries--;
 	}
 
@@ -1471,8 +1521,25 @@ void MissionManagerImplementation::randomizeGenericEntertainerMission(CreatureOb
 		return;
 	}
 
-	SceneObject* target = performanceLocations->getRandomTarget(player, randomRange);
-	if (target == nullptr || !target->isStructureObject()) {
+	int filterDir = enableMissionDirectionFilter ? getPlayerDirectionFilter(player->getObjectID()) : -1;
+	float playerX = player->getWorldPositionX();
+	float playerY = player->getWorldPositionY();
+
+	SceneObject* target = nullptr;
+	int targetTries = (filterDir >= 0) ? 15 : 1;
+	while (targetTries-- > 0) {
+		target = performanceLocations->getRandomTarget(player, randomRange);
+		if (target == nullptr || !target->isStructureObject()) {
+			target = nullptr;
+			continue;
+		}
+		if (filterDir < 0 || positionMatchesDirection(playerX, playerY, target->getPositionX(), target->getPositionY(), filterDir)) {
+			break;
+		}
+		target = nullptr;
+	}
+
+	if (target == nullptr) {
 		return;
 	}
 
@@ -1635,7 +1702,11 @@ void MissionManagerImplementation::randomizeGenericReconMission(CreatureObject* 
 		return;
 	}
 
-	int maximumNumberOfTries = 20;
+	int filterDir = enableMissionDirectionFilter ? getPlayerDirectionFilter(player->getObjectID()) : -1;
+	float playerX = player->getWorldPositionX();
+	float playerY = player->getWorldPositionY();
+
+	int maximumNumberOfTries = (filterDir >= 0) ? 40 : 20;
 	while (!foundPosition && maximumNumberOfTries-- > 0) {
 		position = player->getWorldCoordinate(System::random(3000) + 1000, (float)System::random(360), false);
 
@@ -1644,7 +1715,9 @@ void MissionManagerImplementation::randomizeGenericReconMission(CreatureObject* 
 			Reference<PlanetTravelPoint*> travelPoint = playerZone->getPlanetManager()->getNearestPlanetTravelPoint(position);
 
 			if (travelPoint != nullptr && travelPoint->getArrivalPosition().distanceTo(position) > 1000.0f) {
-				foundPosition = true;
+				if (filterDir < 0 || positionMatchesDirection(playerX, playerY, position.getX(), position.getY(), filterDir)) {
+					foundPosition = true;
+				}
 			}
 		}
 	}
