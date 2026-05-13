@@ -77,7 +77,14 @@ namespace server {
 			Mutex blockingMutex;
 			Condition blockingCondition;
 			bool blockingReceived;
-			bool useSignalQueue;  // Use non-blocking signal queue for callback
+
+			// true: dispatch on main queue (paused during save).
+			// false: dispatch on signal queue (runs during save).
+			bool blockDuringSaveEvent;
+
+			// true: caller runs applyToManagedObject() after wait_for.
+			// false: queue thread runs applyToManagedObject() before the callback.
+			bool isBlockingCall;
 
 #ifdef WITH_SWGREALMS_CALLSTATS
 			// Call trace for detailed profiling (maintains insertion order)
@@ -90,8 +97,11 @@ namespace server {
 			SWGRealmsAPIResult();
 			virtual ~SWGRealmsAPIResult();
 
-			// Parse from JSON - implemented by subclasses
+			// Parse JSON into POD members. Must not acquire Lockers.
 			virtual bool parse() = 0;
+
+			// Apply POD members to managed objects under Locker.
+			virtual void applyToManagedObject() {}
 
 			// Invoke the callback if set
 			inline void invokeCallback() {
@@ -421,6 +431,11 @@ namespace server {
 			// WebSocket streaming client (owned, nullable if disabled)
 			SWGRealmsStreamer* streamer = nullptr;
 
+			// Task queues - registered in ctor so workers spawn at boot and don't potentially block a save
+			TaskQueue* blockingQueue = nullptr;     // Blocks during save - async callbacks that modify objects
+			TaskQueue* signalQueue = nullptr;       // Non-blocking - blocking call completion signals only
+			TaskQueue* metricsQueue = nullptr;      // 1 thread for metrics (BDB handle optimization)
+
 			// Blocking call statistics
 			AtomicInteger outstandingBlockingCalls = 0;
 			AtomicInteger peakConcurrentCalls = 0;
@@ -567,10 +582,6 @@ namespace server {
 			bool isStreamConnected() const;
 			int getStreamPendingCount() const;
 
-			// Task queues
-			static const TaskQueue* getCustomQueue();        // Blocks during save - for async callbacks that modify objects
-			static const TaskQueue* getSignalQueue();        // Non-blocking - for blocking call completion signals only
-			static const TaskQueue* getCustomMetricsQueue(); // 1 thread for metrics (BDB handle optimization)
 			void scheduleMetricsPublish();
 		};
 	}
