@@ -9,6 +9,7 @@
 #include "server/zone/managers/player/PlayerManager.h"
 #include "server/zone/managers/group/GroupLootTask.h"
 #include "server/zone/objects/transaction/TransactionLog.h"
+#include "server/zone/objects/player/PlayerObject.h"
 
 class LootCommand : public QueueCommand {
 
@@ -85,7 +86,12 @@ public:
 		// Allow player to loot the corpse if they own it.
 		if (looterIsOwner) {
 			if (lootAll) {
-				playerManager->lootAll(creature, agent);
+				auto ghost = creature->getSlottedObject("ghost").castTo<PlayerObject*>();
+				if (ghost != nullptr && ghost->isLootFilterEnabled() && ghost->getLootFilterRuleCount() > 0) {
+					playerManager->lootFiltered(creature, agent);
+				} else {
+					playerManager->lootAll(creature, agent);
+				}
 			} else {
 				//Check if the corpse's inventory contains any items.
 				if (lootContainer->getContainerObjectsSize() < 1) {

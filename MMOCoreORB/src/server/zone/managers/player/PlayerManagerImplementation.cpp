@@ -115,6 +115,7 @@
 #include <sys/stat.h>
 #include "server/zone/objects/transaction/TransactionLog.h"
 #include "server/zone/objects/creature/commands/TransferItemMiscCommand.h"
+#include "server/zone/managers/loot/LootFilterManager.h"
 #include "templates/crcstringtable/CrcStringTable.h"
 #include "server/zone/objects/ship/PobShipObject.h"
 #include "server/zone/objects/ship/ai/ShipAiAgent.h"
@@ -4318,6 +4319,88 @@ void PlayerManagerImplementation::lootAll(CreatureObject* player, CreatureObject
 
 		rescheduleCorpseDestruction(player, ai);
 	}
+}
+
+int PlayerManagerImplementation::lootFiltered(CreatureObject* player, CreatureObject* ai) {
+	Locker locker(ai, player);
+
+	if (!ai->isDead() || player->isDead())
+		return 0;
+
+	SceneObject* creatureInventory = ai->getInventory();
+	if (creatureInventory == nullptr)
+		return 0;
+
+	PlayerObject* ghost = player->getPlayerObject();
+	if (ghost == nullptr)
+		return 0;
+
+	LootFilterManager* filterMgr = LootFilterManager::instance();
+
+	auto trxGroup = TransactionLog::getNewTrxGroup();
+
+	int cashCredits = ai->getCashCredits();
+	if (cashCredits > 0) {
+		int luck = player->getSkillMod("force_luck");
+		if (luck > 0)
+			cashCredits += (cashCredits * luck) / 20;
+
+		{
+			TransactionLog trx(ai, player, TrxCode::NPCLOOTCLAIM, cashCredits, true);
+			trx.setTrxGroup(trxGroup);
+			trx.addState("srcDisplayedName", ai->getDisplayedName());
+			player->addCashCredits(cashCredits, true);
+			ai->clearCashCredits();
+		}
+
+		StringIdChatParameter param("base_player", "prose_coin_loot");
+		param.setDI(cashCredits);
+		param.setTT(ai->getObjectID());
+		player->sendSystemMessage(param);
+	}
+
+	ai->notifyObservers(ObserverEventType::LOOTCREATURE, player, 0);
+
+	SceneObject* playerInventory = player->getInventory();
+	if (playerInventory == nullptr)
+		return 0;
+
+	int totalItems = creatureInventory->getContainerObjectsSize();
+	if (totalItems < 1) {
+		rescheduleCorpseDestruction(player, ai);
+		return 0;
+	}
+
+	int matched = 0;
+	int skipped = 0;
+
+	for (int i = totalItems - 1; i >= 0; --i) {
+		SceneObject* object = creatureInventory->getContainerObject(i);
+
+		TangibleObject* tano = (object != nullptr) ? object->asTangibleObject() : nullptr;
+
+		if (tano == nullptr || !filterMgr->filterMatchesItem(ghost, tano)) {
+			++skipped;
+			continue;
+		}
+
+		TransactionLog trx(ai, player, object, TrxCode::NPCLOOTCLAIM);
+		trx.setTrxGroup(trxGroup);
+
+		if (TransferItemMiscCommand::doTransferItemMisc(player, object, playerInventory, -1, trx))
+			++matched;
+	}
+
+	if (creatureInventory->getContainerObjectsSize() <= 0) {
+		player->sendSystemMessage("@base_player:corpse_looted");
+		rescheduleCorpseDestruction(player, ai);
+	} else {
+		StringBuffer msg;
+		msg << "Loot filter: kept " << matched << ", left " << skipped << " in corpse.";
+		player->sendSystemMessage(msg.toString());
+	}
+
+	return matched;
 }
 
 void PlayerManagerImplementation::sendStartingLocationsTo(CreatureObject* player) {

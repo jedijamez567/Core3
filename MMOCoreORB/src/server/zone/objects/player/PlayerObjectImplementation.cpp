@@ -3880,3 +3880,39 @@ void PlayerObjectImplementation::createHelperDroid() {
 	Reference<Task*> createDroid = new SpawnHelperDroidTask(player);
 	createDroid->schedule(5000);
 }
+
+// ---- Loot Filter ---------------------------------------------------------
+
+LootFilterRule PlayerObjectImplementation::getLootFilterRule(int index) const {
+	if (index < 0 || index >= lootFilterRules.size())
+		return LootFilterRule();
+	return lootFilterRules.get(index);
+}
+
+void PlayerObjectImplementation::addLootFilterRule(LootFilterRule& rule) {
+	lootFilterRules.add(rule);
+}
+
+void PlayerObjectImplementation::setLootFilterRule(int index, LootFilterRule& rule) {
+	if (index < 0 || index >= lootFilterRules.size())
+		return;
+	lootFilterRules.set(index, rule);
+}
+
+void PlayerObjectImplementation::removeLootFilterRule(int index) {
+	if (index < 0 || index >= lootFilterRules.size())
+		return;
+	lootFilterRules.remove(index);
+}
+
+void PlayerObjectImplementation::clearLootFilterRules() {
+	lootFilterRules.removeAll();
+}
+
+void PlayerObjectImplementation::setLootFilterRuleEnabled(int index, bool ruleEnabled) {
+	if (index < 0 || index >= lootFilterRules.size())
+		return;
+	LootFilterRule rule = lootFilterRules.get(index);
+	rule.setEnabled(ruleEnabled);
+	lootFilterRules.set(index, rule);
+}

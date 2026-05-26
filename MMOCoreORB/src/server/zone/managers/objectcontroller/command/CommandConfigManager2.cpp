@@ -33,6 +33,7 @@
 #include "server/zone/objects/creature/commands/AddAllowedPlayerCommand.h"
 #include "server/zone/objects/creature/commands/AddBannedPlayerCommand.h"
 #include "server/zone/objects/creature/commands/AddFriendCommand.h"
+#include "server/zone/objects/creature/commands/LootFilterCommand.h"
 #include "server/zone/objects/creature/commands/AddIgnoreCommand.h"
 #include "server/zone/objects/creature/commands/AddMapLocationCommand.h"
 #include "server/zone/objects/creature/commands/AddPowerCommand.h"
@@ -436,6 +437,7 @@ void CommandConfigManager::registerCommands2() {
 	commandFactory.registerCommand<AddAllowedPlayerCommand>(String("addAllowedPlayer").toLowerCase());
 	commandFactory.registerCommand<AddBannedPlayerCommand>(String("addBannedPlayer").toLowerCase());
 	commandFactory.registerCommand<AddFriendCommand>(String("addFriend").toLowerCase());
+	commandFactory.registerCommand<LootFilterCommand>(String("lootFilter").toLowerCase());
 	commandFactory.registerCommand<AddIgnoreCommand>(String("addIgnore").toLowerCase());
 	commandFactory.registerCommand<AddMapLocationCommand>(String("addMapLocation").toLowerCase());
 	commandFactory.registerCommand<AddPowerCommand>(String("addPower").toLowerCase());

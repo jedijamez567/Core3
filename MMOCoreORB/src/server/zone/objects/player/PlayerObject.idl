@@ -43,6 +43,7 @@ include server.zone.objects.player.variables.IgnoreList;
 include server.zone.objects.player.variables.SchematicList;
 include server.zone.objects.player.variables.WaypointList;
 include server.zone.objects.player.variables.PlayerQuestData;
+include server.zone.objects.player.variables.LootFilterRule;
 include server.zone.objects.player.variables.SpaceLaunchPoint;
 include server.zone.objects.scene.variables.DeltaVector;
 include server.zone.objects.scene.variables.DeltaVectorMap;
@@ -315,6 +316,11 @@ class PlayerObject extends IntangibleObject {
 	@rawTemplate(value = "uint32, PlayerQuestData")
 	protected DeltaVectorMap playerQuestsData;
 
+	@dereferenced
+	protected Vector<LootFilterRule> lootFilterRules;
+
+	protected boolean lootFilterEnabled;
+
 	protected unsigned long miliSecsPlayed;
 	protected unsigned long miliSecsSession;
 	protected unsigned long sessionStatsMiliSecs;
@@ -411,6 +417,8 @@ class PlayerObject extends IntangibleObject {
 		holoEmoteUseCount = 0;
 
 		spouseName = "";
+
+		lootFilterEnabled = false;
 
 		foodFilling = 0;
 		foodFillingMax = 0;
@@ -2185,4 +2193,37 @@ class PlayerObject extends IntangibleObject {
 	public boolean isTutorialParticipant() {
 		return tutorialParticipant;
 	}
+
+	// ---- Loot Filter ---------------------------------------------------
+
+	@read
+	public boolean isLootFilterEnabled() {
+		return lootFilterEnabled;
+	}
+
+	public void setLootFilterEnabled(boolean enabled) {
+		lootFilterEnabled = enabled;
+	}
+
+	@read
+	public int getLootFilterRuleCount() {
+		return lootFilterRules.size();
+	}
+
+	@dereferenced
+	@local
+	@read
+	public native LootFilterRule getLootFilterRule(int index);
+
+	@local
+	public native void addLootFilterRule(@dereferenced LootFilterRule rule);
+
+	@local
+	public native void setLootFilterRule(int index, @dereferenced LootFilterRule rule);
+
+	public native void removeLootFilterRule(int index);
+
+	public native void clearLootFilterRules();
+
+	public native void setLootFilterRuleEnabled(int index, boolean ruleEnabled);
 }

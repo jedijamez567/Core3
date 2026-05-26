@@ -285,6 +285,8 @@ class PlayerManager extends Observer implements Logger {
 
 	public native void lootAll(CreatureObject player, CreatureObject creature);
 
+	public native int lootFiltered(CreatureObject player, CreatureObject creature);
+
 	/**
 	 * Starts the ProposeUnitySession
 	 * @param askingPlayer Player iniating the proposal
